@@ -1,0 +1,50 @@
+{
+  "name": "@supercat1337/store-utils",
+  "version": "1.0.0",
+  "description": "Useful utils for @supercat1337/store",
+  "main": "index.js",
+  "scripts": {
+    "test": "c8 ava",
+    "build": "npm run remove_type_files && npm run build_esm && npm run build_esm_min && npm run create_types",
+    "build_esm": "rollup ./src/index.js --file ./dist/store-utils.esm.js --format es",
+    "build_esm_min": "esbuild --minify --bundle --platform=neutral --legal-comments=none ./dist/store-utils.esm.js --outfile=./dist/store-utils.esm.min.js",
+    "build_esm_bundle": "rollup ./src/index.js --file ./dist/store-utils.bundle.esm.js --format es -p ./node_modules/@rollup/plugin-node-resolve",
+    "build_esm_bundle_min": "esbuild --minify --bundle --platform=neutral --legal-comments=none ./src/index.js --outfile=./dist/store-utils.bundle.esm.min.js",
+    "create_types": "npx -p typescript tsc --project my.tsconfig.types.json",
+    "remove_type_files": "del /q *.d.ts *.d.ts.map && cd dist && del /s /q *.d.ts *.d.ts.map && cd ../src && del /s /q *.d.ts *.d.ts.map && cd .."
+  },
+  "keywords": [
+    "reactive",
+    "bind",
+    "directives",
+    "supercat",
+    "supercat1337"
+  ],
+  "author": "SuperCat",
+  "license": "MIT",
+  "type": "module",
+  "moduleResolution": "nodenext",
+  "devDependencies": {
+    "@types/node": "^20.12.2",
+    "ava": "^6.1.2",
+    "browserslist": "^4.23.3",
+    "c8": "^9.1.0",
+    "esbuild": "^0.20.2",
+    "happy-dom": "^14.12.3",
+    "typedoc": "^0.25.13",
+    "typedoc-plugin-markdown": "^3.17.1",
+    "typedoc-plugin-missing-exports": "^2.2.0"
+  },
+  "dependencies": {
+    "@supercat1337/store": "^1.0.29"
+  },
+  "browserslist": [
+    "chrome >0 and last 2.5 years",
+    "edge >0 and last 2.5 years",
+    "safari >0 and last 2.5 years",
+    "firefox >0 and last 2.5 years",
+    "and_chr >0 and last 2.5 years",
+    "and_ff >0 and last 2.5 years",
+    "ios >0 and last 2.5 years"
+  ]
+}
