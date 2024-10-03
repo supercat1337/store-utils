@@ -13,10 +13,10 @@ npm install @supercat1337/store-utils
 This package provides several utility functions for working with stores. Here are a few examples:
 
 This code creates a counter with the following features:
-        - The counter is displayed if the "Show counter" checkbox is checked
-        - The counter is disabled if the "Disable counter" checkbox is checked
-        - The counter will have a red color if the "Show danger text" checkbox is checked
-        - When the checkboxes in the "Selected options" list change, the list will be updated
+- The counter is displayed if the "Show counter" checkbox is checked 
+- The counter is disabled if the "Disable counter" checkbox is checked 
+- The counter will have a red color if the "Show danger text" checkbox is checked 
+- When the checkboxes in the "Selected options" list change, the list will be updated 
 
 ```javascript
 import { Store } from "@supercat1337/store";
