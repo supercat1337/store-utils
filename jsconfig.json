@@ -1,19 +1,19 @@
 {
     "compilerOptions": {
-      "baseUrl": ".",
-      "target": "ESNext",
-      "module": "NodeNext",
-      "noEmit": true,
-      "lib": [
-          "DOM",
-          "ES2020"
-        ],
+        "allowJs": true,
+        "checkJs": true,
+        "resolveJsonModule": true,
+        "target": "ESNext",
+        "module": "NodeNext",
+        "noEmit": true,
+        "lib": ["DOM", "ES2020"],
         "moduleResolution": "NodeNext",
-        "jsx": "preserve",
-        "jsxFactory": "h",
-        "jsxFragmentFactory": "React.Fragment",
-        "jsxImportSource": "react"
-      },
-    "exclude": ["dist/*"],
-    "include": ["src/index.js", "src/**/*", "node_modules/*"]
+        "paths": {
+            "@supercat1337/store-utils": ["./src/index.js"],
+            "@supercat1337/store-utils/*": ["./src/*"],
+            "@/*": ["./src/*"]
+        }
+    },
+    "include": ["src/**/*", "examples/**/*"],
+    "exclude": ["node_modules/*"]
 }

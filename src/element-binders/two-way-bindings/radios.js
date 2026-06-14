@@ -1,77 +1,69 @@
 // @ts-check
-import { globalOptions } from "./../../globalOptions.js";
+import { globalOptions } from '../../globalOptions.js';
 
 /**
- * Synchronizes the value of a reactive variable to the radio buttons
- * @param {HTMLInputElement[]} radios the radio buttons
- * @param { import("@supercat1337/store").Atom<string> } reactive the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
+ * Two-way binding for a group of radio buttons with a string Atom.
+ * @param {HTMLInputElement[]} radios - Array of radio input elements (must share same name).
+ * @param {import("@supercat1337/store").Atom<string>} reactive - The reactive atom.
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function bindToRadios(reactive, radios, options) {
+export function bindToRadioGroup(radios, reactive, options = {}) {
+    if (radios.length === 0) {return () => {};}
 
-    // init 
-    let _options = Object.assign({}, globalOptions, options)
-    let { debounce_time } = _options;
+    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    const { debounceTime, autoDisconnect, event: eventName } = _options;
 
-    if (radios.length === 0) return () => { };
+    const radioName = radios[0].name;
+    if (!radioName) {return () => {};}
 
-    let radio_name = radios[0].name || "";
-    if (radio_name == "") return () => { };
-
-    /** @type {{[key:string]:HTMLInputElement}} */
-    var data = {};
+    /** @type {Record<string, HTMLInputElement>} */
+    const valueToRadio = {};
     for (let i = 0; i < radios.length; i++) {
-        if (radios[i].name == radio_name && radios[i].value != "") {
-            data[radios[i].value] = radios[i];
+        const radio = radios[i];
+        if (radio.name === radioName && radio.value !== '') {
+            valueToRadio[radio.value] = radio;
         }
     }
 
     /**
-     * Sets the value of the reactive variable to the radio buttons
-     * @param {string} value the value of the reactive variable
-     * @private
+     * @param {string} value
      */
     function setter(value) {
-
-        if (data[value]) {
-            //data[value].click();
-            data[value].checked = true;
+        const radio = valueToRadio[value];
+        if (radio && !radio.checked) {
+            radio.checked = true;
         }
     }
+
+    /** @param {Event} e */
+    const changeHandler = e => {
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (target && target.name === radioName) {
+            reactive.value = target.value;
+        }
+    };
 
     setter(reactive.value);
 
-    /**
-     * 
-     * @param {Event} e 
-     */
-    var callback = (e) => {
-        let element = /** @type {HTMLInputElement} */ (e.target);
-        if (!element) return;
-
-        reactive.value = element.value;
-    };
-
     for (let i = 0; i < radios.length; i++) {
-        radios[i].addEventListener("change", callback);
+        radios[i].addEventListener(eventName, changeHandler);
     }
 
-    var unsubscribe = reactive.subscribe((details) => {
-
-        if (_options.autodisconnect && !radios[0].isConnected) {
-            unsubscribe();
+    const storeUnsubscribe = reactive.subscribe(details => {
+        if (autoDisconnect && !radios[0]?.isConnected) {
+            cleanup();
             return;
         }
-
         setter(details.value);
-    }, debounce_time);
+    }, debounceTime);
 
-    return () => {
+    function cleanup() {
         for (let i = 0; i < radios.length; i++) {
-            radios[i].removeEventListener("change", callback);
+            radios[i].removeEventListener(eventName, changeHandler);
         }
-        unsubscribe();
+        storeUnsubscribe();
     }
+
+    return cleanup;
 }

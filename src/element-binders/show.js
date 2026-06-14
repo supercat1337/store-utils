@@ -1,22 +1,35 @@
 // @ts-check
 
-import { bindToCssClass } from "./css_class.js";
-import { globalOptions } from "./../globalOptions.js";
+import { bindToCssClass } from './css-class.js';
+import { globalOptions } from '../globalOptions.js';
 
 /**
- * Binds the value of a reactive variable to the element's visibility
- * @param {HTMLElement} element the HTML element
- * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactive_item the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @param {string} [options.hide_class_name="d-none"] the class name to remove
- * @param {boolean} [options.remove_class_flag=true] whether to remove the class
+ * Binds a boolean reactive value to element visibility using a CSS class.
+ * The class (by default "d-none") is added when reactive value is false,
+ * and removed when true.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").ShowBindingOptions} [options={}] - Options (hideClassName, invert, debounceTime, autoDisconnect).
+ *   - invert: if true, the class is added when reactive value is true (rarely needed).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function bindToShow(reactive_item, element, options = {}) {
+export function bindToShow(element, reactiveItem, options = {}) {
+    const _options = Object.assign(
+        {},
+        globalOptions,
+        { hideClassName: 'd-none', invert: false }, // user's invert applies to show logic
+        options
+    );
+    const { hideClassName, debounceTime, autoDisconnect, invert } = _options;
 
-    let _options = Object.assign({}, globalOptions, { remove_class_flag: true, hide_class_name: "d-none" }, options)
-    let { hide_class_name } = _options;
+    // For show: class should be present when value is false (hidden)
+    // So we need invert = true in the underlying css-class binding,
+    // unless the user explicitly passed invert: true (then we use false).
+    const effectiveInvert = !invert;
 
-    return bindToCssClass(reactive_item, element, hide_class_name, _options);
+    return bindToCssClass(element, reactiveItem, hideClassName, {
+        invert: effectiveInvert,
+        debounceTime,
+        autoDisconnect,
+    });
 }

@@ -1,51 +1,40 @@
 // @ts-check
-import { globalOptions } from "./../../globalOptions.js";
+import { globalOptions } from './../../globalOptions.js';
 
 /**
- * Synchronizes the value of a reactive variable to the checkbox's "checked" property and vice versa
- * @param {HTMLSelectElement} select_element the select element
- * @param { import("@supercat1337/store").Atom<string> } reactive the reactive variable
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time 
+ * Two-way binding for a single-select element with a string Atom.
+ * @param {HTMLSelectElement} selectElement - The select element.
+ * @param {import("@supercat1337/store").Atom<string>} reactive - The reactive atom.
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function bindToSelectElement(reactive, select_element, options = {}) {
+export function bindToSelect(selectElement, reactive, options = {}) {
+    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    const { debounceTime, autoDisconnect, event: eventName } = _options;
 
-    let _options = Object.assign({}, globalOptions, options)
-    let { debounce_time } = _options;
-
-    /**
-     * Initializes the select element with the value of the reactive variable
-     * @param {string} value the value of the reactive variable
-     */
+    /** @param {string} value  */
     function setter(value) {
-        select_element.value = value;
+        selectElement.value = value;
     }
 
     setter(reactive.value);
 
-    /**
-     * 
-     * @param {Event} e 
-     */
-    var callback = (e) => {
-        reactive.value = select_element.value;
+    const callback = () => {
+        reactive.value = selectElement.value;
     };
 
-    select_element.addEventListener("change", callback); 
-    
-    var unsubscribe = reactive.subscribe((details) => {
+    selectElement.addEventListener(eventName, callback);
 
-        if (_options.autodisconnect && !select_element.isConnected) {
+    const unsubscribe = reactive.subscribe(details => {
+        if (autoDisconnect && !selectElement.isConnected) {
             unsubscribe();
             return;
         }
-
         setter(details.value);
-    }, debounce_time);
+    }, debounceTime);
 
     return () => {
-        select_element.removeEventListener("change", callback);
+        selectElement.removeEventListener(eventName, callback);
         unsubscribe();
-    }
+    };
 }

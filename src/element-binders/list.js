@@ -1,160 +1,134 @@
 // @ts-check
 
-import { globalOptions } from "./../globalOptions.js";
-import { getDiffs } from "./../other/helpers.js";
+import { globalOptions } from './../globalOptions.js';
+import { getDiffs } from '../utils/helpers.js';
 
-const item_index_attr_name = "item-index";
+const itemIndexAttrName = 'item-index';
 
-/** 
- * @typedef {(listItemHelper:ListItemHelper)=>HTMLElement} TypeItemCreator
- * */
-
+/** @typedef {(listItemHelper:ListItemHelper)=>HTMLElement} TypeItemCreator */
 
 /**
  * @template T
  */
 class ElementList {
-
     /** @type {HTMLElement} */
-    #root_list_element
+    #rootListElement;
 
     /** @type {import("@supercat1337/store").Collection<T>} */
-    #collection
+    #collection;
 
     /** @type {(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>)=>void} */
-    #item_value_setter
+    #itemValueSetter;
 
     /** @type {TypeItemCreator} */
-    #element_item_creator
+    #elementItemCreator;
 
     /** @type {ListItemHelper} */
-    #listItemHelper
+    #listItemHelper;
 
     /**
-     * Initializes the ElementList instance with a collection, an HTML element, an item value setter function, and an optional element item creator function.
-     * @param {import("@supercat1337/store").Collection<T>} collection - The collection of items to be listed.
-     * @param {HTMLElement} element - The HTML element that contains the list. This is typically a <ul> or <ol> element.
-     * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} item_value_setter - A function that sets the value of a single list item element, given the item element, its index, the value, the old value, and the length of the list.
-     * @param {TypeItemCreator} [element_item_creator] - An optional function that creates a new list item element, given the index of the element. If not provided, the first child element of the list is used as a template.
+     * Initializes the ElementList instance.
+     * @param {import("@supercat1337/store").Collection<T>} collection - The collection of items.
+     * @param {HTMLElement} element - The HTML element that contains the list.
+     * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} itemValueSetter - Function to set value of a single list item.
+     * @param {TypeItemCreator} [elementItemCreator] - Optional custom element creator.
      */
-    constructor(collection, element, item_value_setter, element_item_creator) {
-        // Save the collection and the element to the instance.
+    constructor(collection, element, itemValueSetter, elementItemCreator) {
         this.#collection = collection;
-        this.#root_list_element = element;
+        this.#rootListElement = element;
 
         this.#listItemHelper = new ListItemHelper(this.#loadTemplate());
+        this.#rootListElement.innerHTML = '';
 
-        // Clear the element's HTML content. This is done so that the list item elements are not duplicated, and the list is repopulated with the correct items.
-        this.#root_list_element.innerHTML = "";
-
-        // If the element_item_creator is provided, use it to create new list items.
-        if (element_item_creator) {
-
-            this.#element_item_creator = () => {
-                return element_item_creator(this.#listItemHelper);
+        if (elementItemCreator) {
+            this.#elementItemCreator = () => {
+                return elementItemCreator(this.#listItemHelper);
             };
-
         } else {
-
             if (this.#listItemHelper.hasTemplate()) {
-                this.#element_item_creator = () => {
-                    let item_element = this.#listItemHelper.getTemplate();
-                    if (item_element == null) throw new Error(`template is not set`);
-                    return item_element;
+                this.#elementItemCreator = () => {
+                    const itemElement = this.#listItemHelper.getTemplate();
+                    if (itemElement == null) {throw new Error(`template is not set`);}
+                    return itemElement;
                 };
-            }
-            else {
-                throw new Error(`element_item_creator or template is not set`);
+            } else {
+                throw new Error(`elementItemCreator or template is not set`);
             }
         }
-
-        // Set the item value setter function.
-        this.setElementItemValueSetter(item_value_setter);
-        // Set the data of the list to the value of the collection.
+        this.#itemValueSetter = itemValueSetter;
         this.setData(this.#collection.value);
     }
 
     /**
-     * Loads the first child element of the list.
+     * Loads the first child element as template.
      * @returns {HTMLElement|undefined}
      */
     #loadTemplate() {
-        let list_item = this.#root_list_element.firstElementChild;
-
-        if (list_item) {
-            let list_item_template = /** @type {HTMLElement} */ (list_item.cloneNode(true));
-
-            return list_item_template;
+        const listItem = this.#rootListElement.firstElementChild;
+        if (listItem) {
+            const listItemTemplate = /** @type {HTMLElement} */ (listItem.cloneNode(true));
+            return listItemTemplate;
         }
-
-        list_item = null;
         return;
     }
 
     /**
      * Removes the element at the specified index.
-     * @param {number} index 
+     * @param {number} index
      */
     removeElementListItem(index) {
-        this.#root_list_element.children.item(index)?.remove();
+        this.#rootListElement.children.item(index)?.remove();
     }
 
     /**
-     * Removes the last child element of the list.
-     * This is equivalent to calling `removeElementListItem(length - 1)`.
-     * @returns {void}
+     * Removes the last child element.
      */
     removeLastElementListItem() {
-        this.#root_list_element.lastElementChild?.remove();
+        this.#rootListElement.lastElementChild?.remove();
     }
 
     /**
-     * Sets the value of the element at the specified index, using the provided value and old value.
-     * @param {number} index 
-     * @param {T} value 
-     * @param {any} old_value 
-     * @returns 
+     * Sets the value of the element at the specified index.
+     * @param {number} index
+     * @param {T} value
+     * @param {any} oldValue
      */
-    setElementItemValue(index, value, old_value) {
-        var list_item = /** @type {HTMLElement} */ (this.#root_list_element.children.item(index));
-        if (!list_item) return;
+    setElementItemValue(index, value, oldValue) {
+        const listItem = /** @type {HTMLElement} */ (this.#rootListElement.children.item(index));
+        if (!listItem) {return;}
 
-        list_item.setAttribute(item_index_attr_name, String(index));
+        listItem.setAttribute(itemIndexAttrName, String(index));
 
-        let details = new ListItemSetterDetails(list_item, index, value, old_value, this.#collection.value.length);
-
-        this.#item_value_setter(this.#listItemHelper, details);
+        const details = new ListItemSetterDetails(
+            listItem,
+            index,
+            value,
+            oldValue,
+            this.#collection.value.length
+        );
+        this.#itemValueSetter(this.#listItemHelper, details);
     }
 
     /**
-     * Sets the data for the entire list, updating the values of all elements.
-     * @param {T[]} arr 
+     * Sets the data for the entire list.
+     * @param {T[]} arr
      */
     setData(arr) {
         this.setElementListSize(arr.length);
-
         for (let index = 0; index < arr.length; index++) {
             this.setElementItemValue(index, arr[index], undefined);
         }
     }
 
     /**
-     * Sets the item value setter function for the list.
-     * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} setter 
-     */
-    setElementItemValueSetter(setter) {
-        this.#item_value_setter = setter;
-    }
-
-    /**
      * Sets the size of the list, adding or removing elements as necessary.
-     * @param {number} size 
+     * @param {number} size
      */
     setElementListSize(size) {
-        const root_list = this.#root_list_element;
-        const listItemsLength = root_list.children.length;
+        const rootList = this.#rootListElement;
+        const listItemsLength = rootList.children.length;
 
-        if (listItemsLength === size) return;
+        if (listItemsLength === size) {return;}
 
         if (listItemsLength < size) {
             for (let i = listItemsLength; i < size; i++) {
@@ -168,45 +142,40 @@ class ElementList {
     }
 
     /**
-     * Appends a new element to the list, with the specified value and index.
-     * @param {T} value 
-     * @param {number} index 
+     * Appends a new element to the list.
+     * @param {T} value
+     * @param {number} index
      */
     appendElementListItem(value, index) {
-        var element_item = this.#element_item_creator(this.#listItemHelper);
-        this.#root_list_element.append(element_item);
-
+        const elementItem = this.#elementItemCreator(this.#listItemHelper);
+        this.#rootListElement.append(elementItem);
         this.setElementItemValue(index, value, undefined);
     }
-
 }
 
 /**
- * Returns the list item element by attribute
- * @param {HTMLElement} element 
- * @param {string} [attr_name]
- * @returns {HTMLElement|null} 
+ * Returns the list item element by attribute.
+ * @param {HTMLElement} element
+ * @param {string} [attrName]
+ * @returns {HTMLElement|null}
  */
-function getListItem(element, attr_name) {
-    var search_attr = attr_name || item_index_attr_name;
-    var value = element.getAttribute(search_attr);
-    if (value !== null) return element;
-
-    return element.closest(`[${search_attr}]`);
+function getListItem(element, attrName) {
+    const searchAttr = attrName || itemIndexAttrName;
+    const value = element.getAttribute(searchAttr);
+    if (value !== null) {return element;}
+    return element.closest(`[${searchAttr}]`);
 }
 
 /**
- * Returns the index of the list item element
- * @param {HTMLElement} element 
+ * Returns the index of the list item element.
+ * @param {HTMLElement} element
  * @returns {number}
  */
 function getListItemIndex(element) {
-    var list_item = getListItem(element);
-    if (!list_item) return -1;
-
-    var index = list_item.getAttribute(item_index_attr_name);
-    if (index === null) return -1;
-
+    const listItem = getListItem(element);
+    if (!listItem) {return -1;}
+    const index = listItem.getAttribute(itemIndexAttrName);
+    if (index === null) {return -1;}
     return parseInt(index);
 }
 
@@ -214,81 +183,65 @@ function getListItemIndex(element) {
  * @template T
  */
 export class ListItemSetterDetails {
-
     /** @type {HTMLElement} */
-    item_element;
+    itemElement;
     /** @type {number} */
     index;
     /** @type {T} */
     value;
     /** @type {any} */
-    old_value;
+    oldValue;
     /** @type {number} */
     length;
 
     /**
-     * Initializes the ListItemSetterDetails instance with the list item element, index, value, old value, and length of the list.
-     * @param {HTMLElement} item_element - The list item element.
-     * @param {number} index - The index of the list item element.
-     * @param {T} value - The value of the element.
-     * @param {any} old_value - The old value of the element.
-     * @param {number} length - The length of the list.
+     * @param {HTMLElement} itemElement - The list item element.
+     * @param {number} index - The index.
+     * @param {T} value - The new value.
+     * @param {any} oldValue - The old value.
+     * @param {number} length - The list length.
      */
-    constructor(item_element, index, value, old_value, length) {
-        this.item_element = item_element;
+    constructor(itemElement, index, value, oldValue, length) {
+        this.itemElement = itemElement;
         this.index = index;
         this.value = value;
-        this.old_value = old_value;
+        this.oldValue = oldValue;
         this.length = length;
     }
 }
 
-/*
-Class Definition: The ListItemHelper class is a utility class that helps manage list item elements. It can be initialized with a template HTML element, which can be used to create new list item elements.
-
-Methods:
-
-hasTemplate(): Returns a boolean indicating whether a template element is set.
-getTemplate(): Returns a clone of the template element, or null if no template element is set.
-getListItemIndex(element): Returns the index of the list item element ( delegates to an external getListItemIndex function).
-getListItem(element, attr_name): Returns the list item element by child node (delegates to an external getListItem function).
-getDiffs(new_object, old_object, custom_compare_function): Compares two objects and returns information about their differences (delegates to an external getDiffs function).
-*/
-
 export class ListItemHelper {
-
     /** @type {HTMLElement|null} */
-    #template_element = null;
+    #templateElement = null;
 
     /**
-     * @param {HTMLElement} [template_element] - The template HTML element which is used to create new list item elements.
+     * @param {HTMLElement} [templateElement] - The template HTML element.
      */
-    constructor(template_element) {
-        if (template_element) {
-            this.#template_element = template_element;
+    constructor(templateElement) {
+        if (templateElement) {
+            this.#templateElement = templateElement;
         }
     }
 
     /**
-     * Returns true if a template element is set, otherwise false.
+     * Returns true if a template element is set.
      * @returns {boolean}
      */
     hasTemplate() {
-        return this.#template_element != null;
+        return this.#templateElement != null;
     }
 
     /**
-     * Returns a clone of the template element, which can be used to create a new list item element.
-     * If no template element is set, returns null.
+     * Returns a clone of the template element.
      * @returns {HTMLElement|null}
      */
     getTemplate() {
-        if (this.#template_element == null) return null;
-        return /** @type {HTMLElement} */ (this.#template_element.cloneNode(true));
+        if (this.#templateElement == null) {return null;}
+        return /** @type {HTMLElement} */ (this.#templateElement.cloneNode(true));
     }
 
     /**
-     * Returns the index of the list item element
+     * Returns the index of the list item element.
      * @param {HTMLElement} element
      * @returns {number}
      */
@@ -297,74 +250,79 @@ export class ListItemHelper {
     }
 
     /**
-     * Returns the list item element by child node
+     * Returns the list item element by child node.
      * @param {HTMLElement} element
-     * @param {string} [attr_name]
+     * @param {string} [attrName]
      * @returns {HTMLElement|null}
      */
-    getListItem(element, attr_name) {
-        return getListItem(element, attr_name);
+    getListItem(element, attrName) {
+        return getListItem(element, attrName);
     }
 
     /**
-     * Compares two objects and returns information about their differences
+     * Compares two objects and returns info about their differences.
      * @template {{[key:string]:any}} T
-     * @param {T} new_object 
-     * @param {any} old_object 
-     * @param {(a:any, b:any)=>boolean} [custom_compare_function] 
+     * @param {T} newObject
+     * @param {any} oldObject
+     * @param {(a:any, b:any)=>boolean} [customCompareFunction]
      * @returns {{[key in keyof T]:boolean}}
      */
-    getDiffs(new_object, old_object, custom_compare_function) {
-        return getDiffs(new_object, old_object, custom_compare_function);
+    getDiffs(newObject, oldObject, customCompareFunction) {
+        return getDiffs(newObject, oldObject, customCompareFunction);
     }
 }
 
 /**
- * Binds the array-value of a reactive collection to the element
+ * Binds a reactive collection to a list element, synchronising DOM items.
  * @template T
- * @param {HTMLElement} list_element the HTML element
- * @param { import("@supercat1337/store").Collection<T>} reactive_item the reactive collection
- * @param {TypeItemCreator} [element_item_creator] the element item creator
- * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} item_value_setter the item value setter 
- * @param {{autodisconnect?:boolean}} [options]
+ * @param {HTMLElement} listElement - The container element (e.g., ul, ol).
+ * @param {import("@supercat1337/store").Collection<T>} reactiveItem - The reactive collection.
+ * @param {(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>) => void} itemValueSetter - Function to update an item element.
+ * @param {TypeItemCreator} [elementItemCreator] - Optional custom element creator.
+ * @param {import("../types.d.ts").BindToListOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function bindToList(reactive_item, list_element, item_value_setter, element_item_creator, options = {}) {
+export function bindToList(
+    listElement,
+    reactiveItem,
+    itemValueSetter,
+    elementItemCreator,
+    options = {}
+) {
+    const elementListWrapper = new ElementList(
+        reactiveItem,
+        listElement,
+        itemValueSetter,
+        elementItemCreator
+    );
+    const _options = Object.assign({}, globalOptions, options);
+    const { autoDisconnect } = _options;
 
-    var element_list_wrapper = new ElementList(reactive_item, list_element, item_value_setter, element_item_creator);
-    var _options = Object.assign({}, globalOptions, options);
-
-    var unsubscribe = reactive_item.subscribe((details) => {
-
-        if (_options.autodisconnect && !list_element.isConnected) {
+    const unsubscribe = reactiveItem.subscribe(details => {
+        if (autoDisconnect && !listElement.isConnected) {
             unsubscribe();
             return;
         }
 
         if (details.property === null) {
-            element_list_wrapper.setData(details.value);
+            elementListWrapper.setData(details.value);
             return;
         }
 
-        if (details.property == "length") {
-            element_list_wrapper.setElementListSize(reactive_item.value.length);
+        if (details.property === 'length') {
+            elementListWrapper.setElementListSize(reactiveItem.value.length);
             return;
         }
 
-        var index = parseInt(details.property);
+        const index = parseInt(details.property);
+        if (isNaN(index)) {return;}
 
-        if (isNaN(index)) return;
-
-        if (details.eventType == "set") {
-            element_list_wrapper.setElementItemValue(index, details.value, details.old_value);
+        if (details.eventType === 'set') {
+            elementListWrapper.setElementItemValue(index, details.value, details.oldValue);
+        } else if (details.eventType === 'delete') {
+            elementListWrapper.removeElementListItem(index);
         }
-
-        if (details.eventType == "delete") {
-            element_list_wrapper.removeElementListItem(index);
-        }
-
     }, 0);
 
     return unsubscribe;
 }
-

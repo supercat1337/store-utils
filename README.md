@@ -1,139 +1,121 @@
 # @supercat1337/store-utils
 
-A collection of utility functions for working with stores (created by [@supercat1337/store](https://github.com/supercat1337/store)) in JavaScript applications.
+A collection of DOM binding utilities for reactive stores created by [@supercat1337/store](https://github.com/supercat1337/store).
 
 ## Installation
 
-To install `@supercat1337/store-utils`, run the following command in your terminal:
-```
+```bash
 npm install @supercat1337/store-utils
 ```
-## Usage
 
-This package provides several utility functions for working with stores. Here are a few examples:
+## Features
 
-This code creates a counter with the following features:
-- The counter is displayed if the "Show counter" checkbox is checked 
-- The counter is disabled if the "Disable counter" checkbox is checked 
-- The counter will have a red color if the "Show danger text" checkbox is checked 
-- When the checkboxes in the "Selected options" list change, the list will be updated 
+- One‑way and two‑way bindings between reactive atoms/collections and DOM elements
+- Automatic cleanup when elements are removed from DOM (`autoDisconnect: true` by default)
+- Support for custom event names in two‑way bindings
+- TypeScript support via JSDoc (includes `.d.ts`)
+
+## Quick Example
 
 ```javascript
-import { Store } from "@supercat1337/store";
-import { html, Fragment, bindToCheckbox, bindToCheckboxValues } from "@supercat1337/store-utils";
+import { Store } from '@supercat1337/store';
+import {
+    bindToInput,
+    bindToCheckbox,
+    bindToClassToggle,
+    bindToShow,
+} from '@supercat1337/store-utils';
 
-const store = new Store;
-const counter_atom = store.createAtom(10);
-const show_counter_atom = store.createAtom(true);
-const disable_counter_atom = store.createAtom(false);
+const store = new Store();
+const count = store.createAtom(10);
+const enabled = store.createAtom(true);
+const visible = store.createAtom(true);
+const danger = store.createAtom(false);
 
-const show_danger_text_atom = store.createAtom(false);
-const show_danger_text_computed = store.createComputed(() => {
-    return show_danger_text_atom.value ? "text-danger display-6 px-5" : "px-5";
-});
+// Two-way binding with input
+const input = document.querySelector('input');
+bindToInput(input, count);
 
-const options_collection = store.createCollection( /** @type {string[]} */([]));
-const options_computed = store.createComputed(() => {
-    return options_collection.value.join(", ");
-});
-const show_options_computed = store.createComputed(() => {
-    return options_collection.value.length > 0;
-});
+// Two-way binding with checkbox
+const checkbox = document.querySelector('#enable');
+bindToCheckbox(checkbox, enabled);
 
+// Toggle CSS class when danger is true
+const span = document.querySelector('.counter');
+bindToClassToggle(span, danger, 'text-danger');
 
-/** @typedef {{minus: HTMLButtonElement, plus: HTMLButtonElement, show_counter: HTMLInputElement, disable_counter: HTMLInputElement, show_danger_text: HTMLInputElement}} Refs */
-
-let fragment = /** @type {Fragment<Refs>} */ (html`
-
-<div class="container mt-5">
-
-    <div v-show="${show_counter_atom}" >
-        <button class="btn btn-outline-secondary" ref="minus" v-disabled="${disable_counter_atom}">-</button>
-        <span class="${show_danger_text_computed}">${counter_atom}</span>
-        <button class="btn btn-outline-secondary" ref="plus" v-disabled="${disable_counter_atom}">+</button>
-    </div>
-    
-    <label class="mt-3 d-block">
-        <input type="checkbox" ref="show_counter" class="form-check-input" value="show_counter" />
-        <span class="ps-1">Show counter</span>
-    </label>
-
-    <label class="mt-1 d-block">
-        <input type="checkbox" ref="disable_counter" class="form-check-input" value="disable_counter" />
-        <span class="ps-1">Disable counter<span>
-    </label>
-
-    <label class="mt-1 d-block">
-        <input type="checkbox" ref="show_danger_text" class="form-check-input" value="show_danger_text" />
-        <span class="ps-1">Show danger text</span>
-    </label>
-
-    <div v-show="${show_options_computed}" class="mt-3">Selected options: ${options_computed}</div>
-
-</div>
-
-`);
-
-document.body.append(fragment.root);
-
-let { minus, plus, show_counter, disable_counter, show_danger_text } = fragment.refs;
-
-minus.addEventListener("click", () => {
-    counter_atom.value--;
-});
-
-plus.addEventListener("click", () => {
-    counter_atom.value++;
-});
-
-
-bindToCheckbox(show_counter_atom, show_counter);
-bindToCheckbox(disable_counter_atom, disable_counter);
-bindToCheckbox(show_danger_text_atom, show_danger_text);
-bindToCheckboxValues(options_collection, Array.from(fragment.root.querySelectorAll("input[type=checkbox]")));
+// Show/hide element
+const container = document.querySelector('.container');
+bindToShow(container, visible);
 ```
 
-## API
+## API Reference
 
-**bindToAttr**: Binds a store atom to an attribute of a DOM element. When the atom changes, the attribute is updated with the new value of the atom.
+### One‑way bindings
 
-**bindToCheckbox**: Binds a store atom to the checked state of a checkbox. When the atom changes, the checkbox is updated with the new value of the atom.
+| Function                                                    | Description                                                                                                                  |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `bindToAttribute(element, reactive, attrName, options?)`    | Sets/removes an attribute based on reactive string or null.                                                                  |
+| `bindToClassString(element, reactive, options?)`            | Sets `element.className` from a reactive string.                                                                             |
+| `bindToClassToggle(element, reactive, className, options?)` | Toggles a CSS class based on boolean value. Option `invert` flips the logic.                                                 |
+| `bindToDisabled(element, reactive, options?)`               | Sets `element.disabled` from a reactive boolean.                                                                             |
+| `bindToHtml(element, reactive, options?)`                   | Sets `element.innerHTML` from a reactive string/number.                                                                      |
+| `bindToProperty(element, reactive, propName, options?)`     | Sets any DOM property from a reactive value.                                                                                 |
+| `bindToShow(element, reactive, options?)`                   | Toggles visibility via a CSS class (default `d-none`). Class is applied when value is `false`. Option `invert` changes that. |
+| `bindToStyle(element, reactive, options?)`                  | Sets `element.style.cssText` from a reactive string, or applies an object of styles (replaces all).                          |
+| `bindToDataset(element, reactive, options?)`                | Sets `data-*` attributes from a reactive object (keys become `data-key`). Replaces entire dataset.                           |
+| `bindToText(element, reactive, options?)`                   | Sets `element.textContent` from a reactive string/number.                                                                    |
 
-**bindToClassName**: Binds a store atom to the class name of a DOM element. When the atom changes, the class name is updated with the new value of the atom.
+### Two‑way bindings
 
-**bindToHtml**: Binds a store atom to the innerHTML of a DOM element. When the atom changes, the innerHTML is updated with the new value of the atom.
+| Function                                                | Description                                                                                                                  |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `bindToCheckbox(checkbox, reactive, options?)`          | Syncs checkbox `checked` property with a boolean atom. Listens to `change` event by default.                                 |
+| `bindToCheckboxGroup(checkboxes, collection, options?)` | Syncs a group of checkboxes with a collection of strings (selected values). Listens to `change` event.                       |
+| `bindToInput(input, reactive, options?)`                | Syncs input/textarea value with a string/number atom. By default listens to `input` event (or `change` for `type="number"`). |
+| `bindToRadioGroup(radios, reactive, options?)`          | Syncs a group of radio buttons (same `name`) with a string atom. Listens to `change` event.                                  |
+| `bindToSelect(select, reactive, options?)`              | Syncs a single‑select with a string atom. Listens to `change` event.                                                         |
+| `bindToSelectMultiple(select, collection, options?)`    | Syncs a multi‑select with a collection of strings (selected values). Listens to `change` event.                              |
 
-**bindToInputValue**: Binds a store atom to the value of an input element. When the atom changes, the input value is updated with the new value of the atom.
+### List binding
 
-**bindToProperty**: Binds a store atom to a property of a DOM element. When the atom changes, the property is updated with the new value of the atom.
+| Function                                                                | Description                                                                                                     |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `bindToList(container, collection, itemSetter, itemCreator?, options?)` | Renders a reactive collection into a DOM container. Supports templates and custom element creation.             |
+| `ListItemHelper`                                                        | Helper class provided to `itemSetter` and `itemCreator` – gives access to template, item index, and `getDiffs`. |
+| `ListItemSetterDetails`                                                 | Contains `itemElement`, `index`, `value`, `oldValue`, `length` for each list item.                              |
 
-**bindToShow**: Binds a store atom to the display state of a DOM element. When the atom changes, the display state is updated with the new value of the atom.
+### Utilities
 
-**bindToText**: Binds a store atom to the text content of a DOM element. When the atom changes, the text content is updated with the new value of the atom.
+| Function                               | Description                                                   |
+| -------------------------------------- | ------------------------------------------------------------- |
+| `getDiffs(newObj, oldObj, compareFn?)` | Returns an object with `true` for changed/added properties.   |
+| `globalOptions`                        | Global defaults: `{ debounceTime: 0, autoDisconnect: true }`. |
 
-**bindToList**: Binds a store collection to a &lt;ul&gt; or &lt;ol&gt; element. When the collection changes, the list is updated with the new values of the collection.
+## Options
 
-**ListItemHelper**: A helper class used by bindToList to generate the list items.
+All binding functions accept an optional `options` object:
 
-**ListItemSetterDetails**: An object containing the details of the setter function for the list item. Used by bindToList to generate the list items.
+| Option                   | Type    | Default    | Description                                                           |
+| ------------------------ | ------- | ---------- | --------------------------------------------------------------------- |
+| `debounceTime`           | number  | `0`        | Debounce time (ms) for store subscription.                            |
+| `autoDisconnect`         | boolean | `true`     | Automatically unsubscribe when the bound element is removed from DOM. |
+| `event` (two-way)        | string  | depends    | Custom event name for DOM updates (e.g. `'click'`, `'blur'`).         |
+| `lazy` (input)           | boolean | `false`    | If `true`, listens to `change` instead of `input`.                    |
+| `invert` (class toggles) | boolean | `false`    | If `true`, class is applied when value is `false`.                    |
+| `hideClassName` (show)   | string  | `'d-none'` | CSS class used to hide the element.                                   |
 
-**getDiffs**: A function that returns an array of the differences between two arrays.
+## Global Options
 
-**bindToDisabled**: Binds a store atom to the disabled state of a DOM element. When the atom changes, the disabled state is updated with the new value of the atom.
+You can change defaults for all bindings:
 
-**bindToCssClass**: Binds a store atom to the class name of a DOM element. When the atom changes, the class name is updated with the new value of the atom.
+```javascript
+import { globalOptions } from '@supercat1337/store-utils';
 
-**bindToCheckboxValues**: Binds a store collection to a group of checkboxes. When the collection changes, the checkboxes are updated with the new values of the collection.
-
-**bindToRadios**: Binds a store atom to a group of radio buttons. When the atom changes, the radio buttons are updated with the new value of the atom.
-
-**bindToMultipleSelect**: Binds a store collection to a &lt;select&gt; element with the multiple attribute. When the collection changes, the &lt;select&gt; element is updated with the new values of the collection.
-
-**bindToSelectElement**: Binds a store atom to a &lt;select&gt; element. When the atom changes, the &lt;select&gt; element is updated with the new value of the atom.
-
-**globalOptions**: An object containing the global options for the library. Can be used to set the global options for the library.
-
+globalOptions.debounceTime = 100;
+globalOptions.autoDisconnect = false;
+```
 
 ## License
 
-This repository is licensed under the MIT License. 
+MIT [Albert Bazaleev]

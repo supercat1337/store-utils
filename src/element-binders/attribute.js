@@ -1,36 +1,31 @@
 // @ts-check
 
-import { binder } from "./binder.js";
-import { globalOptions } from "./../globalOptions.js";
+import { binder } from './binder.js';
+import { globalOptions } from './../globalOptions.js';
 
 /**
- * Sets the attribute of the element
- * @param { import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactive_item
+ * Setter for attribute binding.
+ * @param {import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactiveItem
  * @param {HTMLElement} element
- * @param {{attribute_name:string}} ctx
+ * @param {{attributeName: string}} ctx
  */
-function setter(reactive_item, element, ctx) {
-    if (typeof reactive_item.value == "string") {
-        element.setAttribute(ctx.attribute_name, reactive_item.value);
-    } else if (reactive_item.value == null){
-        element.removeAttribute(ctx.attribute_name);
+function setter(reactiveItem, element, ctx) {
+    if (typeof reactiveItem.value === 'string') {
+        element.setAttribute(ctx.attributeName, reactiveItem.value);
+    } else if (reactiveItem.value == null) {
+        element.removeAttribute(ctx.attributeName);
     }
 }
 
-
 /**
- * Binds the value of a reactive variable to the element's attribute. If the value is null, the attribute will be removed.
- * @param {HTMLElement} element HTML element
- * @param { import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactive_item reactive variable
- * @param {string} attribute_name a specific attribute
- * @param {Object} options options
- * @param {number} [options.debounce_time=0] debounce time
+ * Binds a reactive value to an element's attribute. If value is null, attribute is removed.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactiveItem - The reactive item.
+ * @param {string} attributeName - Name of the attribute.
+ * @param {import("../types.d.ts").AttributeBindingOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function bindToAttr(reactive_item, element, attribute_name, options = {}) {
-
-    let _options = Object.assign({}, globalOptions, options)
-
-    // @ts-ignore
-    return binder(reactive_item, element, setter, {attribute_name}, _options);
+export function bindToAttribute(element, reactiveItem, attributeName, options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    return binder(element, reactiveItem, setter, { attributeName }, _options);
 }

@@ -1,33 +1,34 @@
 // @ts-check
-import { globalOptions } from "./../globalOptions.js";
+
+import { globalOptions } from './../globalOptions.js';
+
+// binder is intended for one-way bindings that do not attach DOM event listeners.
+// For two-way bindings, implement custom cleanup logic directly.
 
 /**
- * Binds the value of a reactive variable to the element's property
+ * Binds a reactive item to an element using a custom setter function.
  * @template T
- * @param { import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T> | import("@supercat1337/store").Collection<T>} reactive_item the reactive variable
- * @param {HTMLElement} element the HTML element 
- * @param {(reactive_item:import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T> | import("@supercat1337/store").Collection<T>, element:HTMLElement, ctx:Object, options:{[key:string]:any})=>void} setter a function that updates the element's property with the reactive variable's value
- * @param {Object} [ctx={}] optional context object
- * @param {Object} options options
- * @param {number} [options.debounce_time=0] debounce time
+ * @template {object} C
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>} reactiveItem - The reactive item.
+ * @param {(reactiveItem: import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>, element: HTMLElement, ctx: C, options: import("../types.d.ts").BinderOptions) => void} setter - Function that updates the element.
+ * @param {C} [ctx] - Optional context object passed to setter.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options (debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function binder(reactive_item, element, setter, ctx = {}, options = {}){
+export function binder(element, reactiveItem, setter, ctx = /** @type {C} */ ({}), options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    const { debounceTime } = _options;
 
-    let _options = Object.assign({}, globalOptions, options)
-    let { debounce_time } = _options;
-    
-    //console.log(reactive_item, element.outerHTML, ctx, _options);
-    setter(reactive_item, element, ctx, _options);
+    setter(reactiveItem, element, ctx, _options);
 
-    var unsubscribe = reactive_item.subscribe((details)=>{
-        if (_options.autodisconnect && !element.isConnected) {
+    const unsubscribe = reactiveItem.subscribe(_details => {
+        if (_options.autoDisconnect && !element.isConnected) {
             unsubscribe();
             return;
         }
-
-        setter(reactive_item, element, ctx, _options); 
-    }, debounce_time);
+        setter(reactiveItem, element, ctx, _options);
+    }, debounceTime);
 
     return unsubscribe;
 }

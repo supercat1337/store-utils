@@ -3,3 +3,5 @@ creds
 coverage
 package-lock.json
 .vscode
+bundles
+list.txt

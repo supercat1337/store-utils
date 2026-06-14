@@ -1,17 +1,14 @@
 // @ts-check
 
-import { bindToProperty } from "./property.js";
-
+import { bindToProperty } from './property.js';
 
 /**
- * Binds the value of a reactive variable to the element's "innerHTML" property
- * @param {HTMLElement} element the HTML element
- * @param { import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactive_item the reactive variable
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
+ * Binds a reactive string/number value to the element's innerHTML.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function bindToHtml(reactive_item, element, options = {}) {
-    return bindToProperty(reactive_item, element, "innerHTML", options);
+export function bindToHtml(element, reactiveItem, options = {}) {
+    return bindToProperty(element, reactiveItem, 'innerHTML', options);
 }
-

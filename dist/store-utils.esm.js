@@ -1,89 +1,50 @@
-import { debounce, Atom, Computed, Collection } from '@supercat1337/store';
+import { debounce } from '@supercat1337/store';
 
 // @ts-check
 
 /**
  * Global options for the binders.
- * 
- * @typedef {Object} GlobalOptions
- * @property {number} [debounce_time=0] the default debounce time for all the binders
- * @property {boolean} [autodisconnect=false] whether to automatically disconnect the subscriptions
+ *
+ * @typedef {object} GlobalOptions
+ * @property {number} [debounceTime=0] the default debounce time for all the binders
+ * @property {boolean} [autoDisconnect=true] whether to automatically disconnect the subscriptions
+ *                                   when the element is removed from the DOM
  */
 const globalOptions = {
-    debounce_time: 0,
-    autodisconnect: false,
+    debounceTime: 0,
+    autoDisconnect: true,
 };
 
 // @ts-check
 
 
-/**
- * Sets the element's property from the reactive variable's value
- * @param {import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactive_item the reactive variable
- * @param {HTMLElement|Text} element the HTML element
- * @param {{property_name:string}} ctx the context object
- */
-function setter$3(reactive_item, element, ctx) {
-    element[ctx.property_name] = String(reactive_item.value);
-}
+// binder is intended for one-way bindings that do not attach DOM event listeners.
+// For two-way bindings, implement custom cleanup logic directly.
 
 /**
- * Binds the value of a reactive variable to the element's "textContent" property
- * @param {HTMLElement|Text} element the HTML element
- * @param { import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactive_item the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @returns {import("@supercat1337/store").Unsubscriber}
- */
-function bindToText(reactive_item, element, options = {}) {
-
-    let _options = Object.assign({}, globalOptions, options);
-    let { debounce_time } = _options;
-    let ctx = {property_name: "textContent"};
-
-    setter$3(reactive_item, element, ctx);
-
-    var unsubscribe = reactive_item.subscribe((details)=>{
-        if (_options.autodisconnect && !element.isConnected) {
-            unsubscribe();
-            return;
-        }
-
-        setter$3(reactive_item, element, ctx); 
-    }, debounce_time);
-
-    return unsubscribe;
-}
-
-// @ts-check
-
-/**
- * Binds the value of a reactive variable to the element's property
+ * Binds a reactive item to an element using a custom setter function.
  * @template T
- * @param { import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T> | import("@supercat1337/store").Collection<T>} reactive_item the reactive variable
- * @param {HTMLElement} element the HTML element 
- * @param {(reactive_item:import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T> | import("@supercat1337/store").Collection<T>, element:HTMLElement, ctx:Object, options:{[key:string]:any})=>void} setter a function that updates the element's property with the reactive variable's value
- * @param {Object} [ctx={}] optional context object
- * @param {Object} options options
- * @param {number} [options.debounce_time=0] debounce time
+ * @template {object} C
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>} reactiveItem - The reactive item.
+ * @param {(reactiveItem: import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>, element: HTMLElement, ctx: C, options: import("../types.d.ts").BinderOptions) => void} setter - Function that updates the element.
+ * @param {C} [ctx] - Optional context object passed to setter.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options (debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function binder(reactive_item, element, setter, ctx = {}, options = {}){
+function binder(element, reactiveItem, setter, ctx = /** @type {C} */ ({}), options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    const { debounceTime } = _options;
 
-    let _options = Object.assign({}, globalOptions, options);
-    let { debounce_time } = _options;
-    
-    //console.log(reactive_item, element.outerHTML, ctx, _options);
-    setter(reactive_item, element, ctx, _options);
+    setter(reactiveItem, element, ctx, _options);
 
-    var unsubscribe = reactive_item.subscribe((details)=>{
-        if (_options.autodisconnect && !element.isConnected) {
+    const unsubscribe = reactiveItem.subscribe(_details => {
+        if (_options.autoDisconnect && !element.isConnected) {
             unsubscribe();
             return;
         }
-
-        setter(reactive_item, element, ctx, _options); 
-    }, debounce_time);
+        setter(reactiveItem, element, ctx, _options);
+    }, debounceTime);
 
     return unsubscribe;
 }
@@ -92,473 +53,418 @@ function binder(reactive_item, element, setter, ctx = {}, options = {}){
 
 
 /**
- * Sets the element's property from the reactive variable's value
- * @template T
- * @param {import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>} reactive_item
+ * Setter for attribute binding.
+ * @param {import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactiveItem
  * @param {HTMLElement} element
- * @param {{property_name:string}} ctx
+ * @param {{attributeName: string}} ctx
  */
-function setter$2(reactive_item, element, ctx) {
-    element[ctx.property_name] = reactive_item.value;
-}
-
-/**
- * Binds the value of a reactive variable to the element's property
- * @template T
- * @param {HTMLElement} element the HTML element
- * @param {import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>} reactive_item the reactive variable 
- * @param {Object} options the options
- * @param {string} property_name the property name
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @returns {import("@supercat1337/store").Unsubscriber}
- */
-function bindToProperty(reactive_item, element, property_name, options = {}){
-    let _options = Object.assign({}, globalOptions, options);
-
-    // @ts-ignore
-    return binder(reactive_item, element, setter$2, {property_name}, _options);
-}
-
-// @ts-check
-
-
-
-/**
- * Binds the value of a reactive variable to the element's "innerHTML" property
- * @param {HTMLElement} element the HTML element
- * @param { import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactive_item the reactive variable
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @returns {import("@supercat1337/store").Unsubscriber}
- */
-function bindToHtml(reactive_item, element, options = {}) {
-    return bindToProperty(reactive_item, element, "innerHTML", options);
-}
-
-// @ts-check
-
-
-/**
- * Binds the value of a reactive variable to the element's "className" property
- * @param {HTMLElement} element the HTML element
- * @param { import("@supercat1337/store").Atom<string> | import("@supercat1337/store").Computed<string>} reactive_item the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @returns {import("@supercat1337/store").Unsubscriber}
- */
-function bindToClassName(reactive_item, element, options = {}) {
-    return bindToProperty(reactive_item, element, "className", options);
-}
-
-// @ts-check
-
-
-/**
- * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactive_item 
- * @param {HTMLElement} element 
- * @param {{cssClassName:string}} ctx 
- * @param {Object} options 
- * @param {number} options.debounce_time
- * @param {boolean} options.remove_class_flag 
- */
-function setter$1(reactive_item, element, ctx, options) {
-    let { remove_class_flag } = options;
-
-    var show_class_value = Boolean(reactive_item.value);
-    console.warn(element.className, "show", show_class_value, "remove_class_flag", remove_class_flag, ctx.cssClassName);
-
-    if (remove_class_flag == false) {
-        element.classList.toggle(ctx.cssClassName, show_class_value);
-    } else {
-        //console.log(ctx.cssClassName, !show_class_value)
-        element.classList.toggle(ctx.cssClassName, !show_class_value);
+function setter$5(reactiveItem, element, ctx) {
+    if (typeof reactiveItem.value === 'string') {
+        element.setAttribute(ctx.attributeName, reactiveItem.value);
+    } else if (reactiveItem.value == null) {
+        element.removeAttribute(ctx.attributeName);
     }
 }
 
 /**
- * Binds the value of a reactive variable to the element's css-className" property
- * @param {HTMLElement} element the HTML element
- * @param { import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactive_item the reactive variable
- * @param {string} cssClassName the css-className
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @param {boolean} [options.remove_class_flag=false] remove the css-className
- * 
+ * Binds a reactive value to an element's attribute. If value is null, attribute is removed.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactiveItem - The reactive item.
+ * @param {string} attributeName - Name of the attribute.
+ * @param {import("../types.d.ts").AttributeBindingOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToCssClass(reactive_item, element, cssClassName, options = {}) {
-
-    let _options = Object.assign({}, globalOptions, { remove_class_flag: false }, options);
-
-    let ctx = { cssClassName };
-
-    // @ts-ignore
-    return binder(reactive_item, element, setter$1, ctx, _options);
+function bindToAttribute(element, reactiveItem, attributeName, options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    return binder(element, reactiveItem, setter$5, { attributeName }, _options);
 }
 
 // @ts-check
 
 
 /**
- * Binds the value of a reactive variable to the element's visibility
- * @param {HTMLElement} element the HTML element
- * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactive_item the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @param {string} [options.hide_class_name="d-none"] the class name to remove
- * @param {boolean} [options.remove_class_flag=true] whether to remove the class
- * @returns {import("@supercat1337/store").Unsubscriber}
- */
-function bindToShow(reactive_item, element, options = {}) {
-
-    let _options = Object.assign({}, globalOptions, { remove_class_flag: true, hide_class_name: "d-none" }, options);
-    let { hide_class_name } = _options;
-
-    return bindToCssClass(reactive_item, element, hide_class_name, _options);
-}
-
-// @ts-check
-
-
-/**
- * Sets the attribute of the element
- * @param { import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactive_item
+ * Setter that assigns reactive value to element's property.
+ * @template T
+ * @param {import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>} reactiveItem
  * @param {HTMLElement} element
- * @param {{attribute_name:string}} ctx
+ * @param {{propertyName: string}} ctx
  */
-function setter(reactive_item, element, ctx) {
-    if (typeof reactive_item.value == "string") {
-        element.setAttribute(ctx.attribute_name, reactive_item.value);
-    } else if (reactive_item.value == null){
-        element.removeAttribute(ctx.attribute_name);
-    }
+function setter$4(reactiveItem, element, ctx) {
+    // @ts-ignore
+    element[ctx.propertyName] = reactiveItem.value;
 }
+
+/**
+ * Binds a reactive value to an element's DOM property.
+ * @template T
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>} reactiveItem - The reactive item.
+ * @param {string} propertyName - Name of the property (e.g., 'innerHTML', 'className').
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
+ * @returns {import("@supercat1337/store").Unsubscriber}
+ */
+function bindToProperty(element, reactiveItem, propertyName, options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    return binder(element, reactiveItem, setter$4, { propertyName }, _options);
+}
+
+// @ts-check
 
 
 /**
- * Binds the value of a reactive variable to the element's attribute. If the value is null, the attribute will be removed.
- * @param {HTMLElement} element HTML element
- * @param { import("@supercat1337/store").Atom<string|null> | import("@supercat1337/store").Computed<string|null>} reactive_item reactive variable
- * @param {string} attribute_name a specific attribute
- * @param {Object} options options
- * @param {number} [options.debounce_time=0] debounce time
+ * Binds a reactive string/number value to the element's innerHTML.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToAttr(reactive_item, element, attribute_name, options = {}) {
+function bindToHtml(element, reactiveItem, options = {}) {
+    return bindToProperty(element, reactiveItem, 'innerHTML', options);
+}
 
-    let _options = Object.assign({}, globalOptions, options);
+// @ts-check
 
-    // @ts-ignore
-    return binder(reactive_item, element, setter, {attribute_name}, _options);
+
+/**
+ * Binds a reactive string value to the element's className property.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<string> | import("@supercat1337/store").Computed<string>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
+ * @returns {import("@supercat1337/store").Unsubscriber}
+ */
+function bindToClassString(element, reactiveItem, options = {}) {
+    return bindToProperty(element, reactiveItem, 'className', options);
+}
+
+// @ts-check
+
+
+/**
+ * Setter toggles a CSS class based on boolean reactive value with optional invert.
+ * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactiveItem
+ * @param {HTMLElement} element
+ * @param {{cssClassName: string}} ctx
+ * @param {import("../types.d.ts").CssClassBindingOptions} options
+ */
+function setter$3(reactiveItem, element, ctx, options) {
+    const shouldHaveClass = options.invert ? !reactiveItem.value : reactiveItem.value;
+    element.classList.toggle(ctx.cssClassName, shouldHaveClass);
+}
+
+/**
+ * Binds a boolean reactive value to a CSS class presence (toggles the class).
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactiveItem - The reactive item.
+ * @param {string} cssClassName - The CSS class name to toggle.
+ * @param {import("../types.d.ts").CssClassBindingOptions} [options={}] - Options (invert, debounceTime, autoDisconnect).
+ * @returns {import("@supercat1337/store").Unsubscriber}
+ */
+function bindToCssClass(element, reactiveItem, cssClassName, options = {}) {
+    const _options = Object.assign({}, globalOptions, { invert: false }, options);
+    const ctx = { cssClassName };
+    return binder(element, reactiveItem, setter$3, ctx, _options);
+}
+
+// @ts-check
+
+
+/**
+ * Binds a boolean reactive value to element visibility using a CSS class.
+ * The class (by default "d-none") is added when reactive value is false,
+ * and removed when true.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").ShowBindingOptions} [options={}] - Options (hideClassName, invert, debounceTime, autoDisconnect).
+ *   - invert: if true, the class is added when reactive value is true (rarely needed).
+ * @returns {import("@supercat1337/store").Unsubscriber}
+ */
+function bindToShow(element, reactiveItem, options = {}) {
+    const _options = Object.assign(
+        {},
+        globalOptions,
+        { hideClassName: 'd-none', invert: false }, // user's invert applies to show logic
+        options
+    );
+    const { hideClassName, debounceTime, autoDisconnect, invert } = _options;
+
+    // For show: class should be present when value is false (hidden)
+    // So we need invert = true in the underlying css-class binding,
+    // unless the user explicitly passed invert: true (then we use false).
+    const effectiveInvert = !invert;
+
+    return bindToCssClass(element, reactiveItem, hideClassName, {
+        invert: effectiveInvert,
+        debounceTime,
+        autoDisconnect,
+    });
 }
 
 // @ts-check
 
 /**
- * Synchronizes the value of a reactive variable to the checkbox's "checked" property and vice versa
- * @param {HTMLInputElement} checkbox the checkbox 
- * @param { import("@supercat1337/store").Atom<boolean> } reactive_item the reactive variable
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
-
+ * Two-way binding between a checkbox and a boolean Atom.
+ * @param {HTMLInputElement} checkbox - The checkbox element.
+ * @param {import("@supercat1337/store").Atom<boolean>} reactiveItem - The reactive boolean atom.
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToCheckbox(reactive_item, checkbox, options = {}) {
+function bindToCheckbox(checkbox, reactiveItem, options = {}) {
+    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    const { debounceTime, autoDisconnect, event: eventName } = _options;
 
-    let _options = (Object.assign({}, globalOptions, options));
-
-    let { debounce_time } = _options;
-
-    /**
-     * Sets the value of the reactive variable to the checkbox's "checked" property
-     * @param {boolean} value the value of the reactive variable
-     * @private
-     */
+    /** @param {boolean} value  */
     function setter(value) {
         checkbox.checked = value;
     }
 
-    var callback = (e) => {
-        reactive_item.value = checkbox.checked;
+    const changeHandler = () => {
+        reactiveItem.value = checkbox.checked;
     };
 
-    setter(reactive_item.value);
-    checkbox.addEventListener("change", callback);
+    setter(reactiveItem.value);
+    checkbox.addEventListener(eventName, changeHandler);
 
-    var unsubscribe = reactive_item.subscribe((details) => {
-
-        if (_options.autodisconnect && !checkbox.isConnected) {
-            unsubscribe_main();
+    const storeUnsubscribe = reactiveItem.subscribe(details => {
+        if (autoDisconnect && !checkbox.isConnected) {
+            cleanup();
             return;
         }
-
         setter(details.value);
-    }, debounce_time);
+    }, debounceTime);
 
-    var unsubscribe_main = () => {
-        checkbox.removeEventListener("change", callback);
-        unsubscribe();
-    };
+    function cleanup() {
+        checkbox.removeEventListener(eventName, changeHandler);
+        storeUnsubscribe();
+    }
 
-    return unsubscribe_main;
+    return cleanup;
 }
 
 // @ts-check
 
 
-/** @typedef {(value:any)=>string} TypeInputValueConverter */
-
-
 /**
- * Synchronizes the value of a reactive variable to the input's "value" property and vice versa
- * @param {HTMLInputElement|HTMLTextAreaElement} element the input element
- * @param { import("@supercat1337/store").Atom<string|number> } reactive_item the reactive variable
- * @param {Object} options the options 
- * @param {number} [options.debounce_time=0] the debounce time
- * @param {boolean} [options.lazy=false] if true, the value will be set only when the input is changed 
+ * Two-way binding between an input/textarea and a string/number Atom.
+ * @param {HTMLInputElement|HTMLTextAreaElement} element - The input or textarea element.
+ * @param {import("@supercat1337/store").Atom<string|number>} reactiveItem - The reactive atom.
+ * @param {import("../../types.d.ts").TwoWayBindingOptions & { event?: string }} [options={}] - Options (lazy, event, debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToInputValue(reactive_item, element, options = {}) {
+function bindToInput(element, reactiveItem, options = {}) {
+    const _options = Object.assign({}, globalOptions, { lazy: false }, options);
+    const { debounceTime, lazy, autoDisconnect, event: eventName } = _options;
 
-    let _options = (Object.assign({}, globalOptions, { lazy: false }, options));
-
-    let { debounce_time, lazy } = _options;
-
-    if (element.type == "number") {
-        lazy = true;
-    }
-
-    /**
-     * Sets the value of the input element to the reactive variable's value
-     * @param {string|number} value the value of the reactive variable
-     * @private
-     */
+    /** @param {string|number} value  */
     function setter(value) {
-
-        if (element.value != value) {
-            if (element.type == "number") {
-                element.value = parseFloat(value.toString()).toString();
-            } else {
-                element.value = String(value);
+        let strValue = String(value);
+        if (element.type === 'number') {
+            const num = parseFloat(strValue);
+            if (isNaN(num)) {
+                if (element.value !== '') {
+                    element.value = '';
+                }
+                return;
             }
+            strValue = num.toString();
+        }
+        if (element.value !== strValue) {
+            element.value = strValue;
         }
     }
 
-    var callback = debounce((e) => {
-        let v = element.value;
-
-        if (element.type == "number") {
-            reactive_item.value = parseFloat(v);
+    // debounce from @supercat1337/store returns the same wrapped function reference each time,
+    // so it's safe to use inputHandler directly for addEventListener and removeEventListener.
+    const inputHandler = debounce(() => {
+        const newValue = element.value;
+        if (element.type === 'number') {
+            const num = parseFloat(newValue);
+            reactiveItem.value = isNaN(num) ? 0 : num;
         } else {
-            reactive_item.value = String(v);
+            reactiveItem.value = newValue;
         }
+    }, debounceTime);
 
-    }, debounce_time);
+    const finalEventName = eventName || (lazy || element.type === 'number' ? 'change' : 'input');
+    element.addEventListener(finalEventName, inputHandler);
 
-    element.addEventListener(lazy ? "change" : "input", callback);
+    setter(reactiveItem.value);
 
-    setter(reactive_item.value);
-
-    var unsubscribe = reactive_item.subscribe((details) => {
-
-        if (_options.autodisconnect && !element.isConnected) {
-            unsubscribe();
+    const storeUnsubscribe = reactiveItem.subscribe(details => {
+        if (autoDisconnect && !element.isConnected) {
+            cleanup();
             return;
         }
-
         setter(details.value);
-    }, debounce_time);
+    }, debounceTime);
 
-    return () => {
-        element.removeEventListener("input", callback);
-        unsubscribe();
+    function cleanup() {
+        element.removeEventListener(finalEventName, inputHandler);
+        storeUnsubscribe();
     }
+
+    return cleanup;
 }
 
 // @ts-check
 
 /**
- * Compares two objects and returns information about their differences
+ * Compares two objects and returns information about their differences.
  * @template {{[key:string]:any}} T
- * @param {T} new_object 
- * @param {any} old_object 
- * @param {(a:any, b:any)=>boolean} [custom_compare_function] 
- * @returns {{[key in keyof T]:boolean}}
+ * @param {T} newObject
+ * @param {any} oldObject
+ * @param {(a:any, b:any)=>boolean} [customCompareFunction] - Returns true if values are equal.
+ * @returns {{[key in keyof T]:boolean}} - true if the property has changed.
  */
-function getDiffs(new_object, old_object, custom_compare_function) {
+function getDiffs(newObject, oldObject, customCompareFunction) {
     /** @type {{[key:string]:boolean}} */
-    var result = {};
+    const result = {};
 
-    for (let prop in new_object) {
-        if (typeof prop != "string") continue;
-        
-        if (old_object && old_object.hasOwnProperty(prop)) {
-            result[ prop] = custom_compare_function? custom_compare_function(new_object[prop], old_object[prop]) : new_object[prop] !== old_object[prop];
+    for (const prop in newObject) {
+        if (typeof prop !== 'string') {
+            continue;
         }
-        else {
+
+        if (oldObject && oldObject.hasOwnProperty(prop)) {
+            result[prop] = customCompareFunction
+                ? !customCompareFunction(newObject[prop], oldObject[prop])
+                : newObject[prop] !== oldObject[prop];
+        } else {
             result[prop] = true;
         }
     }
 
-    return /** @type {{[key in keyof T]:boolean}} */(result);
+    return /** @type {{[key in keyof T]:boolean}} */ (result);
 }
 
 // @ts-check
 
 
-const item_index_attr_name = "item-index";
+const itemIndexAttrName = 'item-index';
 
-/** 
- * @typedef {(listItemHelper:ListItemHelper)=>HTMLElement} TypeItemCreator
- * */
-
+/** @typedef {(listItemHelper:ListItemHelper)=>HTMLElement} TypeItemCreator */
 
 /**
  * @template T
  */
 class ElementList {
-
     /** @type {HTMLElement} */
-    #root_list_element
+    #rootListElement;
 
     /** @type {import("@supercat1337/store").Collection<T>} */
-    #collection
+    #collection;
 
     /** @type {(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>)=>void} */
-    #item_value_setter
+    #itemValueSetter;
 
     /** @type {TypeItemCreator} */
-    #element_item_creator
+    #elementItemCreator;
 
     /** @type {ListItemHelper} */
-    #listItemHelper
+    #listItemHelper;
 
     /**
-     * Initializes the ElementList instance with a collection, an HTML element, an item value setter function, and an optional element item creator function.
-     * @param {import("@supercat1337/store").Collection<T>} collection - The collection of items to be listed.
-     * @param {HTMLElement} element - The HTML element that contains the list. This is typically a <ul> or <ol> element.
-     * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} item_value_setter - A function that sets the value of a single list item element, given the item element, its index, the value, the old value, and the length of the list.
-     * @param {TypeItemCreator} [element_item_creator] - An optional function that creates a new list item element, given the index of the element. If not provided, the first child element of the list is used as a template.
+     * Initializes the ElementList instance.
+     * @param {import("@supercat1337/store").Collection<T>} collection - The collection of items.
+     * @param {HTMLElement} element - The HTML element that contains the list.
+     * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} itemValueSetter - Function to set value of a single list item.
+     * @param {TypeItemCreator} [elementItemCreator] - Optional custom element creator.
      */
-    constructor(collection, element, item_value_setter, element_item_creator) {
-        // Save the collection and the element to the instance.
+    constructor(collection, element, itemValueSetter, elementItemCreator) {
         this.#collection = collection;
-        this.#root_list_element = element;
+        this.#rootListElement = element;
 
         this.#listItemHelper = new ListItemHelper(this.#loadTemplate());
+        this.#rootListElement.innerHTML = '';
 
-        // Clear the element's HTML content. This is done so that the list item elements are not duplicated, and the list is repopulated with the correct items.
-        this.#root_list_element.innerHTML = "";
-
-        // If the element_item_creator is provided, use it to create new list items.
-        if (element_item_creator) {
-
-            this.#element_item_creator = () => {
-                return element_item_creator(this.#listItemHelper);
+        if (elementItemCreator) {
+            this.#elementItemCreator = () => {
+                return elementItemCreator(this.#listItemHelper);
             };
-
         } else {
-
             if (this.#listItemHelper.hasTemplate()) {
-                this.#element_item_creator = () => {
-                    let item_element = this.#listItemHelper.getTemplate();
-                    if (item_element == null) throw new Error(`template is not set`);
-                    return item_element;
+                this.#elementItemCreator = () => {
+                    const itemElement = this.#listItemHelper.getTemplate();
+                    if (itemElement == null) {throw new Error(`template is not set`);}
+                    return itemElement;
                 };
-            }
-            else {
-                throw new Error(`element_item_creator or template is not set`);
+            } else {
+                throw new Error(`elementItemCreator or template is not set`);
             }
         }
-
-        // Set the item value setter function.
-        this.setElementItemValueSetter(item_value_setter);
-        // Set the data of the list to the value of the collection.
+        this.#itemValueSetter = itemValueSetter;
         this.setData(this.#collection.value);
     }
 
     /**
-     * Loads the first child element of the list.
+     * Loads the first child element as template.
      * @returns {HTMLElement|undefined}
      */
     #loadTemplate() {
-        let list_item = this.#root_list_element.firstElementChild;
-
-        if (list_item) {
-            let list_item_template = /** @type {HTMLElement} */ (list_item.cloneNode(true));
-
-            return list_item_template;
+        const listItem = this.#rootListElement.firstElementChild;
+        if (listItem) {
+            const listItemTemplate = /** @type {HTMLElement} */ (listItem.cloneNode(true));
+            return listItemTemplate;
         }
-
-        list_item = null;
         return;
     }
 
     /**
      * Removes the element at the specified index.
-     * @param {number} index 
+     * @param {number} index
      */
     removeElementListItem(index) {
-        this.#root_list_element.children.item(index)?.remove();
+        this.#rootListElement.children.item(index)?.remove();
     }
 
     /**
-     * Removes the last child element of the list.
-     * This is equivalent to calling `removeElementListItem(length - 1)`.
-     * @returns {void}
+     * Removes the last child element.
      */
     removeLastElementListItem() {
-        this.#root_list_element.lastElementChild?.remove();
+        this.#rootListElement.lastElementChild?.remove();
     }
 
     /**
-     * Sets the value of the element at the specified index, using the provided value and old value.
-     * @param {number} index 
-     * @param {T} value 
-     * @param {any} old_value 
-     * @returns 
+     * Sets the value of the element at the specified index.
+     * @param {number} index
+     * @param {T} value
+     * @param {any} oldValue
      */
-    setElementItemValue(index, value, old_value) {
-        var list_item = /** @type {HTMLElement} */ (this.#root_list_element.children.item(index));
-        if (!list_item) return;
+    setElementItemValue(index, value, oldValue) {
+        const listItem = /** @type {HTMLElement} */ (this.#rootListElement.children.item(index));
+        if (!listItem) {return;}
 
-        list_item.setAttribute(item_index_attr_name, String(index));
+        listItem.setAttribute(itemIndexAttrName, String(index));
 
-        let details = new ListItemSetterDetails(list_item, index, value, old_value, this.#collection.value.length);
-
-        this.#item_value_setter(this.#listItemHelper, details);
+        const details = new ListItemSetterDetails(
+            listItem,
+            index,
+            value,
+            oldValue,
+            this.#collection.value.length
+        );
+        this.#itemValueSetter(this.#listItemHelper, details);
     }
 
     /**
-     * Sets the data for the entire list, updating the values of all elements.
-     * @param {T[]} arr 
+     * Sets the data for the entire list.
+     * @param {T[]} arr
      */
     setData(arr) {
         this.setElementListSize(arr.length);
-
         for (let index = 0; index < arr.length; index++) {
             this.setElementItemValue(index, arr[index], undefined);
         }
     }
 
     /**
-     * Sets the item value setter function for the list.
-     * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} setter 
-     */
-    setElementItemValueSetter(setter) {
-        this.#item_value_setter = setter;
-    }
-
-    /**
      * Sets the size of the list, adding or removing elements as necessary.
-     * @param {number} size 
+     * @param {number} size
      */
     setElementListSize(size) {
-        const root_list = this.#root_list_element;
-        const listItemsLength = root_list.children.length;
+        const rootList = this.#rootListElement;
+        const listItemsLength = rootList.children.length;
 
-        if (listItemsLength === size) return;
+        if (listItemsLength === size) {return;}
 
         if (listItemsLength < size) {
             for (let i = listItemsLength; i < size; i++) {
@@ -572,45 +478,40 @@ class ElementList {
     }
 
     /**
-     * Appends a new element to the list, with the specified value and index.
-     * @param {T} value 
-     * @param {number} index 
+     * Appends a new element to the list.
+     * @param {T} value
+     * @param {number} index
      */
     appendElementListItem(value, index) {
-        var element_item = this.#element_item_creator(this.#listItemHelper);
-        this.#root_list_element.append(element_item);
-
+        const elementItem = this.#elementItemCreator(this.#listItemHelper);
+        this.#rootListElement.append(elementItem);
         this.setElementItemValue(index, value, undefined);
     }
-
 }
 
 /**
- * Returns the list item element by attribute
- * @param {HTMLElement} element 
- * @param {string} [attr_name]
- * @returns {HTMLElement|null} 
+ * Returns the list item element by attribute.
+ * @param {HTMLElement} element
+ * @param {string} [attrName]
+ * @returns {HTMLElement|null}
  */
-function getListItem(element, attr_name) {
-    var search_attr = attr_name || item_index_attr_name;
-    var value = element.getAttribute(search_attr);
-    if (value !== null) return element;
-
-    return element.closest(`[${search_attr}]`);
+function getListItem(element, attrName) {
+    const searchAttr = attrName || itemIndexAttrName;
+    const value = element.getAttribute(searchAttr);
+    if (value !== null) {return element;}
+    return element.closest(`[${searchAttr}]`);
 }
 
 /**
- * Returns the index of the list item element
- * @param {HTMLElement} element 
+ * Returns the index of the list item element.
+ * @param {HTMLElement} element
  * @returns {number}
  */
 function getListItemIndex(element) {
-    var list_item = getListItem(element);
-    if (!list_item) return -1;
-
-    var index = list_item.getAttribute(item_index_attr_name);
-    if (index === null) return -1;
-
+    const listItem = getListItem(element);
+    if (!listItem) {return -1;}
+    const index = listItem.getAttribute(itemIndexAttrName);
+    if (index === null) {return -1;}
     return parseInt(index);
 }
 
@@ -618,81 +519,65 @@ function getListItemIndex(element) {
  * @template T
  */
 class ListItemSetterDetails {
-
     /** @type {HTMLElement} */
-    item_element;
+    itemElement;
     /** @type {number} */
     index;
     /** @type {T} */
     value;
     /** @type {any} */
-    old_value;
+    oldValue;
     /** @type {number} */
     length;
 
     /**
-     * Initializes the ListItemSetterDetails instance with the list item element, index, value, old value, and length of the list.
-     * @param {HTMLElement} item_element - The list item element.
-     * @param {number} index - The index of the list item element.
-     * @param {T} value - The value of the element.
-     * @param {any} old_value - The old value of the element.
-     * @param {number} length - The length of the list.
+     * @param {HTMLElement} itemElement - The list item element.
+     * @param {number} index - The index.
+     * @param {T} value - The new value.
+     * @param {any} oldValue - The old value.
+     * @param {number} length - The list length.
      */
-    constructor(item_element, index, value, old_value, length) {
-        this.item_element = item_element;
+    constructor(itemElement, index, value, oldValue, length) {
+        this.itemElement = itemElement;
         this.index = index;
         this.value = value;
-        this.old_value = old_value;
+        this.oldValue = oldValue;
         this.length = length;
     }
 }
 
-/*
-Class Definition: The ListItemHelper class is a utility class that helps manage list item elements. It can be initialized with a template HTML element, which can be used to create new list item elements.
-
-Methods:
-
-hasTemplate(): Returns a boolean indicating whether a template element is set.
-getTemplate(): Returns a clone of the template element, or null if no template element is set.
-getListItemIndex(element): Returns the index of the list item element ( delegates to an external getListItemIndex function).
-getListItem(element, attr_name): Returns the list item element by child node (delegates to an external getListItem function).
-getDiffs(new_object, old_object, custom_compare_function): Compares two objects and returns information about their differences (delegates to an external getDiffs function).
-*/
-
 class ListItemHelper {
-
     /** @type {HTMLElement|null} */
-    #template_element = null;
+    #templateElement = null;
 
     /**
-     * @param {HTMLElement} [template_element] - The template HTML element which is used to create new list item elements.
+     * @param {HTMLElement} [templateElement] - The template HTML element.
      */
-    constructor(template_element) {
-        if (template_element) {
-            this.#template_element = template_element;
+    constructor(templateElement) {
+        if (templateElement) {
+            this.#templateElement = templateElement;
         }
     }
 
     /**
-     * Returns true if a template element is set, otherwise false.
+     * Returns true if a template element is set.
      * @returns {boolean}
      */
     hasTemplate() {
-        return this.#template_element != null;
+        return this.#templateElement != null;
     }
 
     /**
-     * Returns a clone of the template element, which can be used to create a new list item element.
-     * If no template element is set, returns null.
+     * Returns a clone of the template element.
      * @returns {HTMLElement|null}
      */
     getTemplate() {
-        if (this.#template_element == null) return null;
-        return /** @type {HTMLElement} */ (this.#template_element.cloneNode(true));
+        if (this.#templateElement == null) {return null;}
+        return /** @type {HTMLElement} */ (this.#templateElement.cloneNode(true));
     }
 
     /**
-     * Returns the index of the list item element
+     * Returns the index of the list item element.
      * @param {HTMLElement} element
      * @returns {number}
      */
@@ -701,72 +586,78 @@ class ListItemHelper {
     }
 
     /**
-     * Returns the list item element by child node
+     * Returns the list item element by child node.
      * @param {HTMLElement} element
-     * @param {string} [attr_name]
+     * @param {string} [attrName]
      * @returns {HTMLElement|null}
      */
-    getListItem(element, attr_name) {
-        return getListItem(element, attr_name);
+    getListItem(element, attrName) {
+        return getListItem(element, attrName);
     }
 
     /**
-     * Compares two objects and returns information about their differences
+     * Compares two objects and returns info about their differences.
      * @template {{[key:string]:any}} T
-     * @param {T} new_object 
-     * @param {any} old_object 
-     * @param {(a:any, b:any)=>boolean} [custom_compare_function] 
+     * @param {T} newObject
+     * @param {any} oldObject
+     * @param {(a:any, b:any)=>boolean} [customCompareFunction]
      * @returns {{[key in keyof T]:boolean}}
      */
-    getDiffs(new_object, old_object, custom_compare_function) {
-        return getDiffs(new_object, old_object, custom_compare_function);
+    getDiffs(newObject, oldObject, customCompareFunction) {
+        return getDiffs(newObject, oldObject, customCompareFunction);
     }
 }
 
 /**
- * Binds the array-value of a reactive collection to the element
+ * Binds a reactive collection to a list element, synchronising DOM items.
  * @template T
- * @param {HTMLElement} list_element the HTML element
- * @param { import("@supercat1337/store").Collection<T>} reactive_item the reactive collection
- * @param {TypeItemCreator} [element_item_creator] the element item creator
- * @param {{(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>):void}} item_value_setter the item value setter 
- * @param {{autodisconnect?:boolean}} [options]
+ * @param {HTMLElement} listElement - The container element (e.g., ul, ol).
+ * @param {import("@supercat1337/store").Collection<T>} reactiveItem - The reactive collection.
+ * @param {(listItemHelper:ListItemHelper, details:ListItemSetterDetails<T>) => void} itemValueSetter - Function to update an item element.
+ * @param {TypeItemCreator} [elementItemCreator] - Optional custom element creator.
+ * @param {import("../types.d.ts").BindToListOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToList(reactive_item, list_element, item_value_setter, element_item_creator, options = {}) {
+function bindToList(
+    listElement,
+    reactiveItem,
+    itemValueSetter,
+    elementItemCreator,
+    options = {}
+) {
+    const elementListWrapper = new ElementList(
+        reactiveItem,
+        listElement,
+        itemValueSetter,
+        elementItemCreator
+    );
+    const _options = Object.assign({}, globalOptions, options);
+    const { autoDisconnect } = _options;
 
-    var element_list_wrapper = new ElementList(reactive_item, list_element, item_value_setter, element_item_creator);
-    var _options = Object.assign({}, globalOptions, options);
-
-    var unsubscribe = reactive_item.subscribe((details) => {
-
-        if (_options.autodisconnect && !list_element.isConnected) {
+    const unsubscribe = reactiveItem.subscribe(details => {
+        if (autoDisconnect && !listElement.isConnected) {
             unsubscribe();
             return;
         }
 
         if (details.property === null) {
-            element_list_wrapper.setData(details.value);
+            elementListWrapper.setData(details.value);
             return;
         }
 
-        if (details.property == "length") {
-            element_list_wrapper.setElementListSize(reactive_item.value.length);
+        if (details.property === 'length') {
+            elementListWrapper.setElementListSize(reactiveItem.value.length);
             return;
         }
 
-        var index = parseInt(details.property);
+        const index = parseInt(details.property);
+        if (isNaN(index)) {return;}
 
-        if (isNaN(index)) return;
-
-        if (details.eventType == "set") {
-            element_list_wrapper.setElementItemValue(index, details.value, details.old_value);
+        if (details.eventType === 'set') {
+            elementListWrapper.setElementItemValue(index, details.value, details.oldValue);
+        } else if (details.eventType === 'delete') {
+            elementListWrapper.removeElementListItem(index);
         }
-
-        if (details.eventType == "delete") {
-            element_list_wrapper.removeElementListItem(index);
-        }
-
     }, 0);
 
     return unsubscribe;
@@ -776,640 +667,349 @@ function bindToList(reactive_item, list_element, item_value_setter, element_item
 
 
 /**
- * Binds the value of a reactive variable to the element's "disabled" property
- * @param {HTMLButtonElement|HTMLInputElement|HTMLFieldSetElement
- * |HTMLLinkElement|HTMLOptGroupElement|HTMLOptionElement
- * |HTMLSelectElement|HTMLStyleElement|HTMLTextAreaElement
- * |SVGStyleElement} element the HTML element
- * @param { import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactive_item the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
+ * Binds a boolean reactive value to the element's disabled property.
+ * @param {HTMLButtonElement|HTMLInputElement|HTMLFieldSetElement|HTMLLinkElement|HTMLOptGroupElement|HTMLOptionElement|HTMLSelectElement|HTMLTextAreaElement|HTMLStyleElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToDisabled(reactive_item, element, options = {}){
-    return bindToProperty(reactive_item, /** @type {HTMLElement} */ (element), "disabled", options);
+function bindToDisabled(element, reactiveItem, options = {}) {
+    return bindToProperty(/** @type {HTMLElement} */ (element), reactiveItem, 'disabled', options);
 }
 
 // @ts-check
 
 /**
- * Synchronizes the value of a reactive variable to the checkbox's "checked" property and vice versa
- * @param {HTMLInputElement[]} checkboxes the array of checkboxes
- * @param { import("@supercat1337/store").Collection<string>} collection the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
-
+ * Two-way binding between a collection of strings and a set of checkboxes with matching values.
+ * @param {HTMLInputElement[]} checkboxes - Array of checkbox elements.
+ * @param {import("@supercat1337/store").Collection<string>} collection - The reactive collection (array of selected values).
+ * @param {import("../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToCheckboxValues(collection, checkboxes, options = {}) {
+function bindToCheckboxGroup(checkboxes, collection, options = {}) {
+    if (checkboxes.length === 0) {return () => {};}
 
-    let _options = (Object.assign({}, globalOptions, options));
+    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    const { debounceTime, autoDisconnect, event: eventName } = _options;
 
-    let { debounce_time } = _options;
-
-    // init 
-
-    /** @type {{[key:string]:HTMLInputElement}} */
-    var data = {};
-
+    // Build value -> checkbox map
+    const valueToCheckbox = {};
     for (let i = 0; i < checkboxes.length; i++) {
-        data[checkboxes[i].value] = checkboxes[i];
+        // @ts-ignore
+        valueToCheckbox[checkboxes[i].value] = checkboxes[i];
     }
 
-    function setter() {
-        let array_of_values = collection.value;
-
+    function updateCheckboxes() {
+        const selectedValues = collection.value;
         for (let i = 0; i < checkboxes.length; i++) {
-            let value = checkboxes[i].value;
-            data[value].checked = array_of_values.indexOf(value) > -1;
+            const cb = checkboxes[i];
+            cb.checked = selectedValues.indexOf(cb.value) !== -1;
         }
     }
 
-
-    var callback = () => {
-        let result = [];
-
+    const changeHandler = () => {
+        const selected = [];
         for (let i = 0; i < checkboxes.length; i++) {
-            if (checkboxes[i].checked)
-                result.push(checkboxes[i].value);
+            if (checkboxes[i].checked) {
+                selected.push(checkboxes[i].value);
+            }
         }
-
-        collection.value = result;
-        //console.log(result);
-
+        collection.value = selected;
     };
 
-    //setter();
-    //callback();
-    
+    updateCheckboxes();
+
     for (let i = 0; i < checkboxes.length; i++) {
-        checkboxes[i].addEventListener("change", callback);
-    }     
+        checkboxes[i].addEventListener(eventName, changeHandler);
+    }
 
-    var unsubscribe = collection.subscribe((details) => {
-
-        if (_options.autodisconnect && !checkboxes[0].isConnected) {
-            unsubscribe();
+    const storeUnsubscribe = collection.subscribe(_details => {
+        if (autoDisconnect && !checkboxes[0]?.isConnected) {
+            cleanup();
             return;
         }
+        updateCheckboxes();
+    }, debounceTime);
 
-        setter();
-    }, debounce_time);
-
-    return () => {
+    function cleanup() {
         for (let i = 0; i < checkboxes.length; i++) {
-            checkboxes[i].removeEventListener("change", callback);
+            checkboxes[i].removeEventListener(eventName, changeHandler);
         }
-        unsubscribe();
+        storeUnsubscribe();
     }
+
+    return cleanup;
 }
 
 // @ts-check
 
 /**
- * Synchronizes the value of a reactive variable to the radio buttons
- * @param {HTMLInputElement[]} radios the radio buttons
- * @param { import("@supercat1337/store").Atom<string> } reactive the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
+ * Two-way binding for a group of radio buttons with a string Atom.
+ * @param {HTMLInputElement[]} radios - Array of radio input elements (must share same name).
+ * @param {import("@supercat1337/store").Atom<string>} reactive - The reactive atom.
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToRadios(reactive, radios, options) {
+function bindToRadioGroup(radios, reactive, options = {}) {
+    if (radios.length === 0) {return () => {};}
 
-    // init 
-    let _options = Object.assign({}, globalOptions, options);
-    let { debounce_time } = _options;
+    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    const { debounceTime, autoDisconnect, event: eventName } = _options;
 
-    if (radios.length === 0) return () => { };
+    const radioName = radios[0].name;
+    if (!radioName) {return () => {};}
 
-    let radio_name = radios[0].name || "";
-    if (radio_name == "") return () => { };
-
-    /** @type {{[key:string]:HTMLInputElement}} */
-    var data = {};
+    /** @type {Record<string, HTMLInputElement>} */
+    const valueToRadio = {};
     for (let i = 0; i < radios.length; i++) {
-        if (radios[i].name == radio_name && radios[i].value != "") {
-            data[radios[i].value] = radios[i];
+        const radio = radios[i];
+        if (radio.name === radioName && radio.value !== '') {
+            valueToRadio[radio.value] = radio;
         }
     }
 
     /**
-     * Sets the value of the reactive variable to the radio buttons
-     * @param {string} value the value of the reactive variable
-     * @private
+     * @param {string} value
      */
     function setter(value) {
-
-        if (data[value]) {
-            //data[value].click();
-            data[value].checked = true;
+        const radio = valueToRadio[value];
+        if (radio && !radio.checked) {
+            radio.checked = true;
         }
     }
+
+    /** @param {Event} e */
+    const changeHandler = e => {
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (target && target.name === radioName) {
+            reactive.value = target.value;
+        }
+    };
 
     setter(reactive.value);
 
-    /**
-     * 
-     * @param {Event} e 
-     */
-    var callback = (e) => {
-        let element = /** @type {HTMLInputElement} */ (e.target);
-        if (!element) return;
-
-        reactive.value = element.value;
-    };
-
     for (let i = 0; i < radios.length; i++) {
-        radios[i].addEventListener("change", callback);
+        radios[i].addEventListener(eventName, changeHandler);
     }
 
-    var unsubscribe = reactive.subscribe((details) => {
-
-        if (_options.autodisconnect && !radios[0].isConnected) {
-            unsubscribe();
+    const storeUnsubscribe = reactive.subscribe(details => {
+        if (autoDisconnect && !radios[0]?.isConnected) {
+            cleanup();
             return;
         }
-
         setter(details.value);
-    }, debounce_time);
+    }, debounceTime);
 
-    return () => {
+    function cleanup() {
         for (let i = 0; i < radios.length; i++) {
-            radios[i].removeEventListener("change", callback);
+            radios[i].removeEventListener(eventName, changeHandler);
         }
-        unsubscribe();
+        storeUnsubscribe();
     }
+
+    return cleanup;
 }
 
 // @ts-check
 
 /**
- * Synchronizes the value of a reactive variable to the checkbox's "checked" property and vice versa
- * @param {HTMLSelectElement} select_element the multiple select element
- * @param { import("@supercat1337/store").Collection<string>} reactive the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
- * @returns {import("@supercat1337/store").Unsubscriber} the unsubscribe function
- */
-function bindToMultipleSelect(reactive, select_element, options = {}) {
-
-    let _options = Object.assign({}, globalOptions, options);
-    let { debounce_time } = _options;
-
-    function setter() {
-        /** @type {string[]} */
-        var array = reactive.value;
-
-        /** @type {{[key:string]:HTMLOptionElement}} */
-        var data = {};
-
-        var options = select_element.options;
-        for (let i = 0; i < options.length; i++) {
-            data[options[i].value] = options[i];
-        }
-
-        for (let i = 0; i < array.length; i++) {
-            if (data[array[i]]) {
-                if (!data[array[i]].selected) {
-                    data[array[i]].selected = true;
-                }
-            }
-        }
-    }
-
-    setter();
-
-    /**
-     * 
-     * @param {Event} e 
-     */
-    var callback = (e) => {
-        reactive.value = Array.from(select_element.selectedOptions).map((option) => option.value);
-    };
-
-    select_element.addEventListener("change", callback);
-
-    var unsubscribe = reactive.subscribe((/** @type {import("@supercat1337/store").TypeUpdateEventDetails} */ details) => {
-
-        if (_options.autodisconnect && !select_element.isConnected) {
-            unsubscribe();
-            return;
-        }
-
-        if (typeof details.property == "string" && /^\d+$/.test(details.property)) {
-            if (details.eventType == "delete") {
-                let option = select_element.options[details.property];
-                if (option && option.selected) {
-                    option.selected = false;
-                }
-            }
-
-            if (details.eventType == "set") {
-                let option = select_element.options[details.property];
-                if (option && !option.selected) {
-                    option.selected = true;
-                }
-            }
-        } else {
-            if (details.eventType == "set") {
-                var options = select_element.options;
-                for (let i = 0; i < options.length; i++) {
-                    let option = select_element.options[i];
-                    option.selected = reactive.value.indexOf(option.value) != -1;
-                }
-            }
-        }
-
-        setter();
-
-    }, debounce_time);
-
-    return () => {
-        select_element.removeEventListener("change", callback);
-        unsubscribe();
-    }
-}
-
-// @ts-check
-
-/**
- * Synchronizes the value of a reactive variable to the checkbox's "checked" property and vice versa
- * @param {HTMLSelectElement} select_element the select element
- * @param { import("@supercat1337/store").Atom<string> } reactive the reactive variable
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time 
+ * Two-way binding for a multiple-select element with a Collection of strings.
+ * @param {HTMLSelectElement} selectElement - The multiple select element.
+ * @param {import("@supercat1337/store").Collection<string>} reactive - The reactive collection (array of selected values).
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function bindToSelectElement(reactive, select_element, options = {}) {
+function bindToSelectMultiple(selectElement, reactive, options = {}) {
+    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    const { debounceTime, autoDisconnect, event: eventName } = _options;
 
-    let _options = Object.assign({}, globalOptions, options);
-    let { debounce_time } = _options;
+    function updateSelectedOptions() {
+        const selectedValues = reactive.value;
+        const options = selectElement.options;
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            option.selected = selectedValues.indexOf(option.value) !== -1;
+        }
+    }
 
-    /**
-     * Initializes the select element with the value of the reactive variable
-     * @param {string} value the value of the reactive variable
-     */
+    updateSelectedOptions();
+
+    const changeHandler = () => {
+        const selected = Array.from(selectElement.selectedOptions).map(opt => opt.value);
+        reactive.value = selected;
+    };
+
+    selectElement.addEventListener(eventName, changeHandler);
+
+    const storeUnsubscribe = reactive.subscribe(_details => {
+        if (autoDisconnect && !selectElement.isConnected) {
+            cleanup();
+            return;
+        }
+        updateSelectedOptions();
+    }, debounceTime);
+
+    function cleanup() {
+        selectElement.removeEventListener(eventName, changeHandler);
+        storeUnsubscribe();
+    }
+
+    return cleanup;
+}
+
+// @ts-check
+
+/**
+ * Two-way binding for a single-select element with a string Atom.
+ * @param {HTMLSelectElement} selectElement - The select element.
+ * @param {import("@supercat1337/store").Atom<string>} reactive - The reactive atom.
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @returns {import("@supercat1337/store").Unsubscriber}
+ */
+function bindToSelect(selectElement, reactive, options = {}) {
+    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    const { debounceTime, autoDisconnect, event: eventName } = _options;
+
+    /** @param {string} value  */
     function setter(value) {
-        select_element.value = value;
+        selectElement.value = value;
     }
 
     setter(reactive.value);
 
-    /**
-     * 
-     * @param {Event} e 
-     */
-    var callback = (e) => {
-        reactive.value = select_element.value;
+    const callback = () => {
+        reactive.value = selectElement.value;
     };
 
-    select_element.addEventListener("change", callback); 
-    
-    var unsubscribe = reactive.subscribe((details) => {
+    selectElement.addEventListener(eventName, callback);
 
-        if (_options.autodisconnect && !select_element.isConnected) {
+    const unsubscribe = reactive.subscribe(details => {
+        if (autoDisconnect && !selectElement.isConnected) {
             unsubscribe();
             return;
         }
-
         setter(details.value);
-    }, debounce_time);
+    }, debounceTime);
 
     return () => {
-        select_element.removeEventListener("change", callback);
+        selectElement.removeEventListener(eventName, callback);
         unsubscribe();
-    }
+    };
 }
 
 // @ts-check
 
 
-
 /**
- * @template {{[key:string]:HTMLElement}} Refs
+ * Setter for style binding. Supports string (cssText) or object.
+ * @param {import("@supercat1337/store").Atom<string|Record<string,string>> | import("@supercat1337/store").Computed<string|Record<string,string>>} reactiveItem
+ * @param {HTMLElement} element
  */
-class Fragment {
-    // element: HTMLElement, unsubscribe: () => void, refs: {[key:string]:HTMLElement
-
-    /** @type {HTMLElement} */
-    root;
-    /** @type {() => void} */
-    unsubscribe;
-    /** @type {Refs} */
-    refs;
-
-    /**
-     * @param {HTMLElement} root the root element of the created fragment
-     * @param {() => void} unsubscribe the function that unsubscribes from the created bindings
-     * @param {Refs} refs the map of references to the created elements
-     */
-    constructor(root, unsubscribe, refs) {
-        this.root = root;
-        this.unsubscribe = unsubscribe;
-        this.refs = refs;
+function setter$2(reactiveItem, element) {
+    const value = reactiveItem.value;
+    if (typeof value === 'string') {
+        element.style.cssText = value;
+    } else if (value && typeof value === 'object') {
+        // Clear all existing inline styles
+        element.style.cssText = '';
+        // Apply new styles
+        Object.assign(element.style, value);
     }
 }
 
 /**
- * @param {string} textContent
- * @param {Map<number, Atom<string|null|boolean|number>|Computed<string|null|boolean|number>>} storage 
- * @return {{reactive: Atom<string|null|boolean|number>|Computed<string|null|boolean|number>|null, content: string}[]}}
+ * Binds a reactive string or style object to the element's style.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<string|Record<string,string>> | import("@supercat1337/store").Computed<string|Record<string,string>>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
+ * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function textToTextNodes(textContent, storage) {
-
-    /** @type {{reactive: Atom<string|null|boolean|number>|Computed<string|null|boolean|number>|null, content: string}[]} */
-    let textNodes = [];
-    let re = /\{{(\d+)}}/;
-    let text = textContent;
-
-    while (re.test(text)) {
-
-        let match = re.exec(text);
-        
-        if (!match) {
-            break;
-        }
-
-        let index = match[1];
-
-        textNodes.push({
-            content: text.slice(0, match.index),
-            reactive: null
-        });
-
-        text = text.slice(match.index + match[0].length);
-
-        let reactive = storage.get(parseInt(index));
-
-        if (reactive) {
-            textNodes.push({
-                content: String(reactive.value),
-                reactive
-            });
-        } else {
-            textNodes.push({
-                content: "{{" + index + "}}",
-                reactive: null
-            });
-
-        }
-
-
-    }
-
-    textNodes.push({
-        content: text,
-        reactive: null
-    });
-
-    return textNodes;
+function bindToStyle(element, reactiveItem, options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    return binder(element, reactiveItem, setter$2, {}, _options);
 }
 
-/**
- * Returns true if the given value is an object and not an array.
- * @param {any} object
- * @returns {boolean}
- */
-function isObject(object) {
-    return object !== null && !isArray(object) && typeof object === "object"; // && (object).constructor.name == "Object"
-}
-
-/**
- * Returns true if the given value is an array.
- * @param {any} object
- * @returns {boolean}
- */
-function isArray(object) {
-    return Array.isArray(object);
-}
-
-/** 
- * @typedef {Object} CustomTaggedTemplateOptions
- * @property {number} [debounce_time=0] the default debounce time for all the binders
- * @property {boolean} [autodisconnect=false] whether to automatically disconnect the subscriptions
- * @property {any} [document] the document to use
- * */
+// @ts-check
 
 
 /**
- * Creates a custom tagged template literal function, which can be used to bind reactive variables to HTML elements.
- * The function is a bound version of the html function, which means that the options object is pre-applied to the function.
- * This can be useful if you want to use the same set of options for multiple invocations of the html function.
- * @param {CustomTaggedTemplateOptions} [options={}] the options object to be pre-applied to the html function
- * @returns {(literals: TemplateStringsArray, ...expressions: (Atom<string|null|boolean|number>|Computed<string|null|boolean|number>|string|number|boolean)[]) => Fragment<any>}
+ * Setter for dataset binding. Expects an object; each key becomes a data-* attribute.
+ * @param {import("@supercat1337/store").Atom<Record<string,string>> | import("@supercat1337/store").Computed<Record<string,string>>} reactiveItem
+ * @param {HTMLElement} element
  */
-function createCustomTaggedTemplate(options = {}) {
-    let taggedTemplate = html.bind(options);
-    return taggedTemplate
+function setter$1(reactiveItem, element) {
+    const data = reactiveItem.value;
+    if (data && typeof data === 'object') {
+        // Remove old data-* attributes not present in new object
+        for (const attr of element.getAttributeNames()) {
+            if (attr.startsWith('data-')) {
+                const key = attr.slice(5);
+                if (!(key in data)) {
+                    element.removeAttribute(attr);
+                }
+            }
+        }
+        // Set new ones
+        for (const [key, value] of Object.entries(data)) {
+            element.dataset[key] = value;
+        }
+    } else if (data == null) {
+        // Remove all data-* attributes
+        for (const attr of element.getAttributeNames()) {
+            if (attr.startsWith('data-')) {
+                element.removeAttribute(attr);
+            }
+        }
+    }
 }
 
 /**
- * Tagged template literal function, which can be used to bind reactive variables to HTML elements.
- * @template {{[key:string]:HTMLElement}} Refs
- * @param {TemplateStringsArray} literals
- * @param {...(Atom<string|null|boolean|number>|Computed<string|null|boolean|number>|string|number|boolean)} expressions
- * @returns {Fragment<Refs>}
+ * Binds a reactive object to the element's dataset (data-* attributes).
+ * The reactive item must provide an object where keys map to data-* attribute names.
+ * @param {HTMLElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<Record<string,string>> | import("@supercat1337/store").Computed<Record<string,string>>} reactiveItem - The reactive item (object).
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
+ * @returns {import("@supercat1337/store").Unsubscriber}
  */
-function html(literals, ...expressions) {
-
-    let options = isObject(this) ? this : {};
-
-    /** @type {Map<number, Atom<string|null|boolean|number>|Computed<string|null|boolean|number>>} */
-    let storage = new Map;
-    /** @type {string[]} */
-    let html_code = [];
-    let strings = Array.from(literals);
-    let unsubscribers = [];
-    /** @type {{[key:string]:HTMLElement}} */
-    let refs = {};
-
-    strings[0] = literals[0].trimStart();
-    strings[strings.length - 1] = literals[strings.length - 1].trimEnd();
-
-    for (let i = 0; i < strings.length; i++) {
-        html_code.push(strings[i]);
-
-        if (expressions[i] == undefined) continue;
-
-        if (expressions[i] instanceof Atom || expressions[i] instanceof Computed || expressions[i] instanceof Collection) {
-            let reactive = expressions[i];
-            // @ts-ignore
-            storage.set(i, reactive);
-
-            html_code.push(`{{${i}}}`);
-        } else {
-            html_code.push(String(expressions[i]));
-        }
-
-    }
-
-    let doc = /** @type {Document} */ (options.document || globalThis.document);
-    
-    let code = html_code.join("").trim();
-    let template = doc.createElement("template");
-    template.innerHTML = code;
-
-    if (template.content.childNodes.length > 1) throw new Error("Template literal contains multiple nodes");
-    if (template.content.childNodes.length == 0) throw new Error("Template literal contains no nodes");
-
-    let root = doc.importNode(template.content.childNodes[0], true);
-
-    const tw = doc.createTreeWalker(root, 1 /* NodeFilter.SHOW_ELEMENT */ | 4 /* NodeFilter.SHOW_TEXT */);
-
-    let currentNode;
-
-    /** @type {{node: Node, textNodes: {reactive: Atom<string|null|boolean|number>|Computed<string|null|boolean|number>|null, content: string}[]}[]} */
-    let patchText = [];
-
-    /** @type {{node: Node, attribute:Attr, reactive: Atom<string|null|boolean|number>|Computed<string|null|boolean|number>|null}[]}[]} */
-    let patchElement = [];
-
-    while (currentNode = (tw.nextNode())) {
-
-        if (currentNode.nodeType == 3 /* Node.TEXT_NODE */) {
-            if (currentNode.textContent!== null) {
-                let textNodes = textToTextNodes(currentNode.textContent, storage);
-                patchText.push({ node: currentNode, textNodes: textNodes });    
-            }
-        }
-        else if (currentNode.nodeType == 1 /* Node.ELEMENT_NODE*/) {
-
-            // @ts-ignore
-            let element = /** @type {HTMLElement} */ (currentNode);
-
-            for (let i = 0; i < element.attributes.length; i++) {
-
-                let attribute = element.attributes[i];
-
-                if (attribute.name == "ref") {
-                    refs[attribute.value] = element;
-                    continue;
-                }
-
-                if (attribute.value.match(/^\{\{(\d+)\}\}$/)) {
-
-                    attribute.value = attribute.value.replace(/\{\{(\d+)\}\}/, (m, /** @type {string} */ expression_id) => {
-
-                        let reactive = storage.get(parseInt(expression_id));
-                        if (reactive) {
-                            patchElement.push({ node: element, attribute, reactive });
-                        }
-
-                        return "{{" + expression_id + "}}";
-                    });
-                }
-
-            }
-
-        }
-
-    }
-
-    for (let i = 0; i < patchText.length; i++) {
-
-        let { node, textNodes } = patchText[i];
-
-        for (let j = 0; j < textNodes.length; j++) {
-            let childNode = doc.createTextNode(textNodes[j].content);
-            let reactive = textNodes[j].reactive;
-            if (reactive == null) continue;
-
-            if (textNodes[j].reactive != null) {
-                if (!(typeof reactive.value == "string" || typeof reactive.value == "number")) {
-                    throw new Error("reactive variable must be a string for text binding");
-                }
-
-                // @ts-ignore
-                let unsubscribe = bindToText(reactive, childNode, options);
-                unsubscribers.push(unsubscribe);
-            }
-
-            node.parentNode?.insertBefore(childNode, node);
-        }
-
-        node.parentNode?.removeChild(node);
-    }
-
-    for (let i = 0; i < patchElement.length; i++) {
-
-        let { node, attribute, reactive } = patchElement[i];
-
-        //console.log(node, attribute.name, attribute.value, reactive.value);
-
-        let element = /** @type {HTMLElement} */ (node);
-
-        if (reactive == null) continue;
-
-        switch (attribute.name) {
-            case "v-text": {
-                if (!(typeof reactive.value == "string" || typeof reactive.value == "number")) {
-                    throw new Error("v-text can only be used with strings");
-                }
-
-                // @ts-ignore
-                let unsubscribe = bindToText(reactive, element, options);
-                unsubscribers.push(unsubscribe);
-                element.removeAttribute("v-text");
-                break;
-            }
-            case "v-html": {
-                if (typeof reactive.value != "string") {
-                    throw new Error("v-html can only be used with strings");
-                }
-
-                // @ts-ignore
-                let unsubscribe = bindToHtml(reactive, element, options);
-                unsubscribers.push(unsubscribe);
-                element.removeAttribute("v-html");
-                break;
-            }
-
-            case "v-show": {
-                if (typeof reactive.value != "boolean") {
-                    throw new Error("v-show can only be used with booleans");
-                }
-
-                // @ts-ignore
-                let unsubscribe = bindToShow(reactive, element, options);
-                unsubscribers.push(unsubscribe);
-                element.removeAttribute("v-show");
-                break;
-            }
-            case "v-disabled": {
-                if (typeof reactive.value != "boolean") {
-                    throw new Error("v-disabled can only be used with booleans");
-                }
-
-                // @ts-ignore
-                let unsubscribe = bindToDisabled(reactive, element, options);
-                unsubscribers.push(unsubscribe);
-                element.removeAttribute("v-disabled");
-                break;
-            }
-
-            default: {
-                if (!(reactive.value == null || typeof reactive.value == "string")) {
-                    throw new Error("reactive variable must be a string for attribute binding");
-                }
-
-                // @ts-ignore 
-                let unsubscribe = bindToAttr(reactive, element, attribute.name, options);
-                unsubscribers.push(unsubscribe);
-            }
-        }
-
-    }
-
-    let root_element = /** @type {HTMLElement} */( /** @type {any} */ root);
-    let unsubscriber = () => {
-        for (let i = 0; i < unsubscribers.length; i++) {
-            unsubscribers[i]();
-        }
-    };
-    
-    let fragment = /** @type {Fragment<Refs>} */ (new Fragment(root_element, unsubscriber, refs));
-
-    return fragment;
+function bindToDataset(element, reactiveItem, options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    return binder(element, reactiveItem, setter$1, {}, _options);
 }
 
-export { Fragment, ListItemHelper, ListItemSetterDetails, bindToAttr, bindToCheckbox, bindToCheckboxValues, bindToClassName, bindToCssClass, bindToDisabled, bindToHtml, bindToInputValue, bindToList, bindToMultipleSelect, bindToProperty, bindToRadios, bindToSelectElement, bindToShow, bindToText, createCustomTaggedTemplate, getDiffs, globalOptions, html };
+// @ts-check
+
+
+/**
+ * Setter for textContent binding.
+ * @param {import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactiveItem
+ * @param {HTMLElement|Text} element
+ */
+function setter(reactiveItem, element) {
+    element.textContent = String(reactiveItem.value);
+}
+
+/**
+ * Binds a reactive string/number value to the element's textContent.
+ * @param {HTMLElement|Text} element - The DOM element or text node.
+ * @param {import("@supercat1337/store").Atom<string|number> | import("@supercat1337/store").Computed<string|number>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
+ * @returns {import("@supercat1337/store").Unsubscriber}
+ */
+function bindToText(element, reactiveItem, options = {}) {
+    const _options = Object.assign({}, globalOptions, options);
+    const { debounceTime, autoDisconnect } = _options;
+
+    setter(reactiveItem, element);
+
+    const unsubscribe = reactiveItem.subscribe(_details => {
+        if (autoDisconnect && !element.isConnected) {
+            unsubscribe();
+            return;
+        }
+        setter(reactiveItem, element);
+    }, debounceTime);
+
+    return unsubscribe;
+}
+
+export { ListItemHelper, ListItemSetterDetails, bindToAttribute, bindToCheckbox, bindToCheckboxGroup, bindToClassString, bindToCssClass, bindToDataset, bindToDisabled, bindToHtml, bindToInput, bindToList, bindToProperty, bindToRadioGroup, bindToSelect, bindToSelectMultiple, bindToShow, bindToStyle, bindToText, getDiffs, globalOptions };

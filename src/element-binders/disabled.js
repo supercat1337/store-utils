@@ -1,18 +1,14 @@
 // @ts-check
 
-import { bindToProperty } from "./property.js";
+import { bindToProperty } from './property.js';
 
 /**
- * Binds the value of a reactive variable to the element's "disabled" property
- * @param {HTMLButtonElement|HTMLInputElement|HTMLFieldSetElement
- * |HTMLLinkElement|HTMLOptGroupElement|HTMLOptionElement
- * |HTMLSelectElement|HTMLStyleElement|HTMLTextAreaElement
- * |SVGStyleElement} element the HTML element
- * @param { import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactive_item the reactive variable 
- * @param {Object} options the options
- * @param {number} [options.debounce_time=0] the debounce time
+ * Binds a boolean reactive value to the element's disabled property.
+ * @param {HTMLButtonElement|HTMLInputElement|HTMLFieldSetElement|HTMLLinkElement|HTMLOptGroupElement|HTMLOptionElement|HTMLSelectElement|HTMLTextAreaElement|HTMLStyleElement} element - The DOM element.
+ * @param {import("@supercat1337/store").Atom<boolean> | import("@supercat1337/store").Computed<boolean>} reactiveItem - The reactive item.
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options.
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
-export function bindToDisabled(reactive_item, element, options = {}){
-    return bindToProperty(reactive_item, /** @type {HTMLElement} */ (element), "disabled", options);
+export function bindToDisabled(element, reactiveItem, options = {}) {
+    return bindToProperty(/** @type {HTMLElement} */ (element), reactiveItem, 'disabled', options);
 }

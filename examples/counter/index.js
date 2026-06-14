@@ -1,7 +1,7 @@
 // @ts-check
 
 import { Store } from "@supercat1337/store";
-import { html, Fragment, bindToCheckbox, bindToCheckboxValues } from "./../../src/index.js";
+import { bindToCheckbox } from "./../../src/index.js";
 
 const store = new Store;
 const counter_atom = store.createAtom(10);
