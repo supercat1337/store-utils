@@ -1,3 +1,5 @@
+// @ts-check
+
 /*
 This code is an example of a simple to-do list application. 
 It uses a library called Store from the @supercat1337/store package, which is used for creating and managing state in JavaScript applications.
@@ -10,8 +12,6 @@ It sets up event listeners for various user interactions, such as adding a new t
 
 Overall, this code sets up the basic structure of a to-do list application, including the data management and presentation layers.
 */
-
-// @ts-check
 
 import { Store } from '@supercat1337/store';
 import { tasks_service } from './task-service.js';
