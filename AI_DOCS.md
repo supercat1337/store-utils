@@ -43,6 +43,7 @@ All bindings accept an optional `options` object with:
 
 - `debounceTime?: number` (default `0`)
 - `autoDisconnect?: boolean` (default `true`)
+- `signal?: AbortSignal` – if provided, the binding will automatically unsubscribe when the signal is aborted. Useful for integration with component lifecycles (e.g., React `useEffect`, Vue `onUnmounted`).
 - plus binding‑specific options.
 
 ---
@@ -267,6 +268,19 @@ bindToList(
     null,
     { autoDisconnect: true }
 );
+```
+
+### Using AbortSignal for automatic cleanup
+
+All bindings support the `signal` option, which allows you to automatically unbind when an `AbortSignal` is aborted. This is especially useful in component frameworks.
+
+```javascript
+const controller = new AbortController();
+
+const unsubscribe = bindToInput(inputElement, nameAtom, { signal: controller.signal });
+
+// Later, when the component unmounts:
+controller.abort(); // automatically cleans up the binding
 ```
 
 ---

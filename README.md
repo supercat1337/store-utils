@@ -96,14 +96,15 @@ bindToShow(container, visible);
 
 All binding functions accept an optional `options` object:
 
-| Option                   | Type    | Default    | Description                                                           |
-| ------------------------ | ------- | ---------- | --------------------------------------------------------------------- |
-| `debounceTime`           | number  | `0`        | Debounce time (ms) for store subscription.                            |
-| `autoDisconnect`         | boolean | `true`     | Automatically unsubscribe when the bound element is removed from DOM. |
-| `event` (two-way)        | string  | depends    | Custom event name for DOM updates (e.g. `'click'`, `'blur'`).         |
-| `lazy` (input)           | boolean | `false`    | If `true`, listens to `change` instead of `input`.                    |
-| `invert` (class toggles) | boolean | `false`    | If `true`, class is applied when value is `false`.                    |
-| `hideClassName` (show)   | string  | `'d-none'` | CSS class used to hide the element.                                   |
+| Option                   | Type        | Default     | Description                                                                                             |
+| ------------------------ | ----------- | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `debounceTime`           | number      | `0`         | Debounce time (ms) for store subscription.                                                              |
+| `autoDisconnect`         | boolean     | `true`      | Automatically unsubscribe when the bound element is removed from DOM.                                   |
+| `signal`                 | AbortSignal | `undefined` | AbortSignal that triggers automatic unbinding when aborted. Useful for component lifecycle integration. |
+| `event` (two-way)        | string      | depends     | Custom event name for DOM updates (e.g. `'click'`, `'blur'`).                                           |
+| `lazy` (input)           | boolean     | `false`     | If `true`, listens to `change` instead of `input`.                                                      |
+| `invert` (class toggles) | boolean     | `false`     | If `true`, class is applied when value is `false`.                                                      |
+| `hideClassName` (show)   | string      | `'d-none'`  | CSS class used to hide the element.                                                                     |
 
 ## Global Options
 
@@ -114,6 +115,19 @@ import { globalOptions } from '@supercat1337/store-utils';
 
 globalOptions.debounceTime = 100;
 globalOptions.autoDisconnect = false;
+```
+
+### Using AbortSignal for automatic cleanup
+
+All bindings support the `signal` option, which allows you to automatically unbind when an `AbortSignal` is aborted. This is especially useful in component frameworks.
+
+```javascript
+const controller = new AbortController();
+
+const unsubscribe = bindToInput(inputElement, nameAtom, { signal: controller.signal });
+
+// Later, when the component unmounts:
+controller.abort(); // automatically cleans up the binding
 ```
 
 ## License

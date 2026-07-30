@@ -1,6 +1,6 @@
 {
     "name": "@supercat1337/store-utils",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "DOM binding utilities for @supercat1337/store – reactive atoms, collections, and computed values",
     "main": "dist/store-utils.esm.js",
     "types": "dist/types.d.ts",
