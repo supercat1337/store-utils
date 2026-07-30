@@ -6,6 +6,11 @@ export interface BinderOptions {
     debounceTime?: number;
     /** Automatically disconnect when element is removed from DOM (default false) */
     autoDisconnect?: boolean;
+    /**
+     * AbortSignal that will trigger automatic unbinding when aborted.
+     * Useful for component lifecycle integration.
+     */
+    signal?: AbortSignal;
 }
 
 export interface AttributeBindingOptions extends BinderOptions {

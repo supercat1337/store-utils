@@ -2,6 +2,7 @@
 
 import { globalOptions } from './../globalOptions.js';
 import { getDiffs } from '../utils/helpers.js';
+import { attachAbortSignal } from '../utils/abort-helper.js';
 
 const itemIndexAttrName = 'item-index';
 
@@ -48,7 +49,9 @@ class ElementList {
             if (this.#listItemHelper.hasTemplate()) {
                 this.#elementItemCreator = () => {
                     const itemElement = this.#listItemHelper.getTemplate();
-                    if (itemElement == null) {throw new Error(`template is not set`);}
+                    if (itemElement == null) {
+                        throw new Error(`template is not set`);
+                    }
                     return itemElement;
                 };
             } else {
@@ -95,7 +98,9 @@ class ElementList {
      */
     setElementItemValue(index, value, oldValue) {
         const listItem = /** @type {HTMLElement} */ (this.#rootListElement.children.item(index));
-        if (!listItem) {return;}
+        if (!listItem) {
+            return;
+        }
 
         listItem.setAttribute(itemIndexAttrName, String(index));
 
@@ -128,7 +133,9 @@ class ElementList {
         const rootList = this.#rootListElement;
         const listItemsLength = rootList.children.length;
 
-        if (listItemsLength === size) {return;}
+        if (listItemsLength === size) {
+            return;
+        }
 
         if (listItemsLength < size) {
             for (let i = listItemsLength; i < size; i++) {
@@ -162,7 +169,9 @@ class ElementList {
 function getListItem(element, attrName) {
     const searchAttr = attrName || itemIndexAttrName;
     const value = element.getAttribute(searchAttr);
-    if (value !== null) {return element;}
+    if (value !== null) {
+        return element;
+    }
     return element.closest(`[${searchAttr}]`);
 }
 
@@ -173,9 +182,13 @@ function getListItem(element, attrName) {
  */
 function getListItemIndex(element) {
     const listItem = getListItem(element);
-    if (!listItem) {return -1;}
+    if (!listItem) {
+        return -1;
+    }
     const index = listItem.getAttribute(itemIndexAttrName);
-    if (index === null) {return -1;}
+    if (index === null) {
+        return -1;
+    }
     return parseInt(index);
 }
 
@@ -236,7 +249,9 @@ export class ListItemHelper {
      * @returns {HTMLElement|null}
      */
     getTemplate() {
-        if (this.#templateElement == null) {return null;}
+        if (this.#templateElement == null) {
+            return null;
+        }
         return /** @type {HTMLElement} */ (this.#templateElement.cloneNode(true));
     }
 
@@ -296,7 +311,7 @@ export function bindToList(
         elementItemCreator
     );
     const _options = Object.assign({}, globalOptions, options);
-    const { autoDisconnect } = _options;
+    const { autoDisconnect, signal } = _options;
 
     const unsubscribe = reactiveItem.subscribe(details => {
         if (autoDisconnect && !listElement.isConnected) {
@@ -315,7 +330,9 @@ export function bindToList(
         }
 
         const index = parseInt(details.property);
-        if (isNaN(index)) {return;}
+        if (isNaN(index)) {
+            return;
+        }
 
         if (details.eventType === 'set') {
             elementListWrapper.setElementItemValue(index, details.value, details.oldValue);
@@ -324,5 +341,10 @@ export function bindToList(
         }
     }, 0);
 
-    return unsubscribe;
+    const removeAbortListener = attachAbortSignal(signal, unsubscribe);
+
+    return () => {
+        unsubscribe();
+        removeAbortListener();
+    };
 }

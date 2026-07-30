@@ -2,17 +2,18 @@
 
 import { debounce } from '@supercat1337/store';
 import { globalOptions } from '../../globalOptions.js';
+import { attachAbortSignal } from '../../utils/abort-helper.js';
 
 /**
  * Two-way binding between an input/textarea and a string/number Atom.
  * @param {HTMLInputElement|HTMLTextAreaElement} element - The input or textarea element.
  * @param {import("@supercat1337/store").Atom<string|number>} reactiveItem - The reactive atom.
- * @param {import("../../types.d.ts").TwoWayBindingOptions & { event?: string }} [options={}] - Options (lazy, event, debounceTime, autoDisconnect).
+ * @param {import("../../types.d.ts").TwoWayBindingOptions & { event?: string }} [options={}] - Options (lazy, event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 export function bindToInput(element, reactiveItem, options = {}) {
     const _options = Object.assign({}, globalOptions, { lazy: false }, options);
-    const { debounceTime, lazy, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, lazy, autoDisconnect, event: eventName, signal } = _options;
 
     /** @param {string|number} value  */
     function setter(value) {
@@ -32,8 +33,8 @@ export function bindToInput(element, reactiveItem, options = {}) {
         }
     }
 
-    // debounce from @supercat1337/store returns the same wrapped function reference each time,
-    // so it's safe to use inputHandler directly for addEventListener and removeEventListener.
+    const finalEventName = eventName || (lazy || element.type === 'number' ? 'change' : 'input');
+
     const inputHandler = debounce(() => {
         const newValue = element.value;
         if (element.type === 'number') {
@@ -44,9 +45,7 @@ export function bindToInput(element, reactiveItem, options = {}) {
         }
     }, debounceTime);
 
-    const finalEventName = eventName || (lazy || element.type === 'number' ? 'change' : 'input');
     element.addEventListener(finalEventName, inputHandler);
-
     setter(reactiveItem.value);
 
     const storeUnsubscribe = reactiveItem.subscribe(details => {
@@ -62,5 +61,10 @@ export function bindToInput(element, reactiveItem, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }

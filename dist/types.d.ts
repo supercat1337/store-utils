@@ -6,6 +6,11 @@ export interface BinderOptions {
     debounceTime?: number;
     /** Automatically disconnect when element is removed from DOM (default false) */
     autoDisconnect?: boolean;
+    /**
+     * AbortSignal that will trigger automatic unbinding when aborted.
+     * Useful for component lifecycle integration.
+     */
+    signal?: AbortSignal;
 }
 
 export interface AttributeBindingOptions extends BinderOptions {
@@ -100,7 +105,7 @@ export function bindToAttribute(element: HTMLElement, reactiveItem: Atom<string 
  * @param {Atom<T> | Computed<T>} reactiveItem - The reactive item.
  * @param {(reactiveItem: Atom<T> | Computed<T>, element: HTMLElement, ctx: C, options: BinderOptions) => void} setter - Function that updates the element.
  * @param {C} [ctx] - Optional context object passed to setter.
- * @param {BinderOptions} [options={}] - Options (debounceTime, autoDisconnect).
+ * @param {BinderOptions} [options={}] - Options (debounceTime, autoDisconnect, signal).
  * @returns {Unsubscriber}
  */
 export function binder<T, C extends unknown>(element: HTMLElement, reactiveItem: Atom<T> | Computed<T>, setter: (reactiveItem: Atom<T> | Computed<T>, element: HTMLElement, ctx: C, options: BinderOptions) => void, ctx?: C, options?: BinderOptions): Unsubscriber;
@@ -110,7 +115,7 @@ export function binder<T, C extends unknown>(element: HTMLElement, reactiveItem:
  * Two-way binding between a collection of strings and a set of checkboxes with matching values.
  * @param {HTMLInputElement[]} checkboxes - Array of checkbox elements.
  * @param {Collection<string>} collection - The reactive collection (array of selected values).
- * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {Unsubscriber}
  */
 export function bindToCheckboxGroup(checkboxes: HTMLInputElement[], collection: Collection<string>, options?: BinderOptions & {
@@ -292,6 +297,17 @@ export function bindToStyle(element: HTMLElement, reactiveItem: Atom<string | Re
  */
 export function bindToText(element: HTMLElement | Text, reactiveItem: Atom<string | number> | Computed<string | number>, options?: BinderOptions): Unsubscriber;
 
+/* From utils\abort-helper.d.ts */
+/**
+ * Attaches an abort handler to an AbortSignal that calls the provided cleanup function when aborted.
+ * If the signal is already aborted, cleanup is called immediately.
+ *
+ * @param {AbortSignal | undefined} signal - The abort signal (optional).
+ * @param {() => void} cleanup - The cleanup function to call on abort.
+ * @returns {() => void} - A function to remove the abort listener (no-op if signal not provided or already aborted).
+ */
+export function attachAbortSignal(signal: AbortSignal | undefined, cleanup: () => void): () => void;
+
 /* From utils\helpers.d.ts */
 /**
  * Compares two objects and returns information about their differences.
@@ -310,7 +326,7 @@ export function getDiffs<T extends {
  * Two-way binding between a checkbox and a boolean Atom.
  * @param {HTMLInputElement} checkbox - The checkbox element.
  * @param {Atom<boolean>} reactiveItem - The reactive boolean atom.
- * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {Unsubscriber}
  */
 export function bindToCheckbox(checkbox: HTMLInputElement, reactiveItem: Atom<boolean>, options?: BinderOptions & {
@@ -322,7 +338,7 @@ export function bindToCheckbox(checkbox: HTMLInputElement, reactiveItem: Atom<bo
  * Two-way binding between an input/textarea and a string/number Atom.
  * @param {HTMLInputElement|HTMLTextAreaElement} element - The input or textarea element.
  * @param {Atom<string|number>} reactiveItem - The reactive atom.
- * @param {TwoWayBindingOptions & { event?: string }} [options={}] - Options (lazy, event, debounceTime, autoDisconnect).
+ * @param {TwoWayBindingOptions & { event?: string }} [options={}] - Options (lazy, event, debounceTime, autoDisconnect, signal).
  * @returns {Unsubscriber}
  */
 export function bindToInput(element: HTMLInputElement | HTMLTextAreaElement, reactiveItem: Atom<string | number>, options?: TwoWayBindingOptions & {
@@ -334,7 +350,7 @@ export function bindToInput(element: HTMLInputElement | HTMLTextAreaElement, rea
  * Two-way binding for a multiple-select element with a Collection of strings.
  * @param {HTMLSelectElement} selectElement - The multiple select element.
  * @param {Collection<string>} reactive - The reactive collection (array of selected values).
- * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {Unsubscriber}
  */
 export function bindToSelectMultiple(selectElement: HTMLSelectElement, reactive: Collection<string>, options?: BinderOptions & {
@@ -346,7 +362,7 @@ export function bindToSelectMultiple(selectElement: HTMLSelectElement, reactive:
  * Two-way binding for a group of radio buttons with a string Atom.
  * @param {HTMLInputElement[]} radios - Array of radio input elements (must share same name).
  * @param {Atom<string>} reactive - The reactive atom.
- * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {Unsubscriber}
  */
 export function bindToRadioGroup(radios: HTMLInputElement[], reactive: Atom<string>, options?: BinderOptions & {
@@ -358,7 +374,7 @@ export function bindToRadioGroup(radios: HTMLInputElement[], reactive: Atom<stri
  * Two-way binding for a single-select element with a string Atom.
  * @param {HTMLSelectElement} selectElement - The select element.
  * @param {Atom<string>} reactive - The reactive atom.
- * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {Unsubscriber}
  */
 export function bindToSelect(selectElement: HTMLSelectElement, reactive: Atom<string>, options?: BinderOptions & {

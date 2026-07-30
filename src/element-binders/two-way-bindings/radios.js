@@ -1,21 +1,26 @@
 // @ts-check
 import { globalOptions } from '../../globalOptions.js';
+import { attachAbortSignal } from '../../utils/abort-helper.js';
 
 /**
  * Two-way binding for a group of radio buttons with a string Atom.
  * @param {HTMLInputElement[]} radios - Array of radio input elements (must share same name).
  * @param {import("@supercat1337/store").Atom<string>} reactive - The reactive atom.
- * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 export function bindToRadioGroup(radios, reactive, options = {}) {
-    if (radios.length === 0) {return () => {};}
+    if (radios.length === 0) {
+        return () => {};
+    }
 
     const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
-    const { debounceTime, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, autoDisconnect, event: eventName, signal } = _options;
 
     const radioName = radios[0].name;
-    if (!radioName) {return () => {};}
+    if (!radioName) {
+        return () => {};
+    }
 
     /** @type {Record<string, HTMLInputElement>} */
     const valueToRadio = {};
@@ -65,5 +70,10 @@ export function bindToRadioGroup(radios, reactive, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }

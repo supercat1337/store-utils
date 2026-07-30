@@ -1,6 +1,7 @@
 // @ts-check
 
 import { globalOptions } from './../globalOptions.js';
+import { attachAbortSignal } from '../utils/abort-helper.js';
 
 /**
  * Setter for textContent binding.
@@ -20,7 +21,7 @@ function setter(reactiveItem, element) {
  */
 export function bindToText(element, reactiveItem, options = {}) {
     const _options = Object.assign({}, globalOptions, options);
-    const { debounceTime, autoDisconnect } = _options;
+    const { debounceTime, autoDisconnect, signal } = _options;
 
     setter(reactiveItem, element);
 
@@ -32,5 +33,10 @@ export function bindToText(element, reactiveItem, options = {}) {
         setter(reactiveItem, element);
     }, debounceTime);
 
-    return unsubscribe;
+    const removeAbortListener = attachAbortSignal(signal, unsubscribe);
+
+    return () => {
+        unsubscribe();
+        removeAbortListener();
+    };
 }

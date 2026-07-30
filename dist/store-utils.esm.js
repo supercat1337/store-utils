@@ -17,6 +17,33 @@ const globalOptions = {
 
 // @ts-check
 
+/**
+ * Attaches an abort handler to an AbortSignal that calls the provided cleanup function when aborted.
+ * If the signal is already aborted, cleanup is called immediately.
+ *
+ * @param {AbortSignal | undefined} signal - The abort signal (optional).
+ * @param {() => void} cleanup - The cleanup function to call on abort.
+ * @returns {() => void} - A function to remove the abort listener (no-op if signal not provided or already aborted).
+ */
+function attachAbortSignal(signal, cleanup) {
+    if (!signal) {
+        return () => {};
+    }
+    if (signal.aborted) {
+        cleanup();
+        return () => {};
+    }
+    const handler = () => {
+        cleanup();
+    };
+    signal.addEventListener('abort', handler);
+    return () => {
+        signal.removeEventListener('abort', handler);
+    };
+}
+
+// @ts-check
+
 
 // binder is intended for one-way bindings that do not attach DOM event listeners.
 // For two-way bindings, implement custom cleanup logic directly.
@@ -29,24 +56,31 @@ const globalOptions = {
  * @param {import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>} reactiveItem - The reactive item.
  * @param {(reactiveItem: import("@supercat1337/store").Atom<T> | import("@supercat1337/store").Computed<T>, element: HTMLElement, ctx: C, options: import("../types.d.ts").BinderOptions) => void} setter - Function that updates the element.
  * @param {C} [ctx] - Optional context object passed to setter.
- * @param {import("../types.d.ts").BinderOptions} [options={}] - Options (debounceTime, autoDisconnect).
+ * @param {import("../types.d.ts").BinderOptions} [options={}] - Options (debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 function binder(element, reactiveItem, setter, ctx = /** @type {C} */ ({}), options = {}) {
     const _options = Object.assign({}, globalOptions, options);
-    const { debounceTime } = _options;
+    const { debounceTime, autoDisconnect, signal } = _options;
 
     setter(reactiveItem, element, ctx, _options);
 
     const unsubscribe = reactiveItem.subscribe(_details => {
-        if (_options.autoDisconnect && !element.isConnected) {
+        if (autoDisconnect && !element.isConnected) {
             unsubscribe();
             return;
         }
         setter(reactiveItem, element, ctx, _options);
     }, debounceTime);
 
-    return unsubscribe;
+    // Attach abort signal if provided
+    const removeAbortListener = attachAbortSignal(signal, unsubscribe);
+
+    // Return a combined unsubscribe function
+    return () => {
+        unsubscribe();
+        removeAbortListener();
+    };
 }
 
 // @ts-check
@@ -205,12 +239,12 @@ function bindToShow(element, reactiveItem, options = {}) {
  * Two-way binding between a checkbox and a boolean Atom.
  * @param {HTMLInputElement} checkbox - The checkbox element.
  * @param {import("@supercat1337/store").Atom<boolean>} reactiveItem - The reactive boolean atom.
- * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 function bindToCheckbox(checkbox, reactiveItem, options = {}) {
     const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
-    const { debounceTime, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, autoDisconnect, event: eventName, signal } = _options;
 
     /** @param {boolean} value  */
     function setter(value) {
@@ -237,7 +271,12 @@ function bindToCheckbox(checkbox, reactiveItem, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }
 
 // @ts-check
@@ -247,12 +286,12 @@ function bindToCheckbox(checkbox, reactiveItem, options = {}) {
  * Two-way binding between an input/textarea and a string/number Atom.
  * @param {HTMLInputElement|HTMLTextAreaElement} element - The input or textarea element.
  * @param {import("@supercat1337/store").Atom<string|number>} reactiveItem - The reactive atom.
- * @param {import("../../types.d.ts").TwoWayBindingOptions & { event?: string }} [options={}] - Options (lazy, event, debounceTime, autoDisconnect).
+ * @param {import("../../types.d.ts").TwoWayBindingOptions & { event?: string }} [options={}] - Options (lazy, event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 function bindToInput(element, reactiveItem, options = {}) {
     const _options = Object.assign({}, globalOptions, { lazy: false }, options);
-    const { debounceTime, lazy, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, lazy, autoDisconnect, event: eventName, signal } = _options;
 
     /** @param {string|number} value  */
     function setter(value) {
@@ -272,8 +311,8 @@ function bindToInput(element, reactiveItem, options = {}) {
         }
     }
 
-    // debounce from @supercat1337/store returns the same wrapped function reference each time,
-    // so it's safe to use inputHandler directly for addEventListener and removeEventListener.
+    const finalEventName = eventName || (lazy || element.type === 'number' ? 'change' : 'input');
+
     const inputHandler = debounce(() => {
         const newValue = element.value;
         if (element.type === 'number') {
@@ -284,9 +323,7 @@ function bindToInput(element, reactiveItem, options = {}) {
         }
     }, debounceTime);
 
-    const finalEventName = eventName || (lazy || element.type === 'number' ? 'change' : 'input');
     element.addEventListener(finalEventName, inputHandler);
-
     setter(reactiveItem.value);
 
     const storeUnsubscribe = reactiveItem.subscribe(details => {
@@ -302,7 +339,12 @@ function bindToInput(element, reactiveItem, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }
 
 // @ts-check
@@ -384,7 +426,9 @@ class ElementList {
             if (this.#listItemHelper.hasTemplate()) {
                 this.#elementItemCreator = () => {
                     const itemElement = this.#listItemHelper.getTemplate();
-                    if (itemElement == null) {throw new Error(`template is not set`);}
+                    if (itemElement == null) {
+                        throw new Error(`template is not set`);
+                    }
                     return itemElement;
                 };
             } else {
@@ -431,7 +475,9 @@ class ElementList {
      */
     setElementItemValue(index, value, oldValue) {
         const listItem = /** @type {HTMLElement} */ (this.#rootListElement.children.item(index));
-        if (!listItem) {return;}
+        if (!listItem) {
+            return;
+        }
 
         listItem.setAttribute(itemIndexAttrName, String(index));
 
@@ -464,7 +510,9 @@ class ElementList {
         const rootList = this.#rootListElement;
         const listItemsLength = rootList.children.length;
 
-        if (listItemsLength === size) {return;}
+        if (listItemsLength === size) {
+            return;
+        }
 
         if (listItemsLength < size) {
             for (let i = listItemsLength; i < size; i++) {
@@ -498,7 +546,9 @@ class ElementList {
 function getListItem(element, attrName) {
     const searchAttr = attrName || itemIndexAttrName;
     const value = element.getAttribute(searchAttr);
-    if (value !== null) {return element;}
+    if (value !== null) {
+        return element;
+    }
     return element.closest(`[${searchAttr}]`);
 }
 
@@ -509,9 +559,13 @@ function getListItem(element, attrName) {
  */
 function getListItemIndex(element) {
     const listItem = getListItem(element);
-    if (!listItem) {return -1;}
+    if (!listItem) {
+        return -1;
+    }
     const index = listItem.getAttribute(itemIndexAttrName);
-    if (index === null) {return -1;}
+    if (index === null) {
+        return -1;
+    }
     return parseInt(index);
 }
 
@@ -572,7 +626,9 @@ class ListItemHelper {
      * @returns {HTMLElement|null}
      */
     getTemplate() {
-        if (this.#templateElement == null) {return null;}
+        if (this.#templateElement == null) {
+            return null;
+        }
         return /** @type {HTMLElement} */ (this.#templateElement.cloneNode(true));
     }
 
@@ -632,7 +688,7 @@ function bindToList(
         elementItemCreator
     );
     const _options = Object.assign({}, globalOptions, options);
-    const { autoDisconnect } = _options;
+    const { autoDisconnect, signal } = _options;
 
     const unsubscribe = reactiveItem.subscribe(details => {
         if (autoDisconnect && !listElement.isConnected) {
@@ -651,7 +707,9 @@ function bindToList(
         }
 
         const index = parseInt(details.property);
-        if (isNaN(index)) {return;}
+        if (isNaN(index)) {
+            return;
+        }
 
         if (details.eventType === 'set') {
             elementListWrapper.setElementItemValue(index, details.value, details.oldValue);
@@ -660,7 +718,12 @@ function bindToList(
         }
     }, 0);
 
-    return unsubscribe;
+    const removeAbortListener = attachAbortSignal(signal, unsubscribe);
+
+    return () => {
+        unsubscribe();
+        removeAbortListener();
+    };
 }
 
 // @ts-check
@@ -683,14 +746,16 @@ function bindToDisabled(element, reactiveItem, options = {}) {
  * Two-way binding between a collection of strings and a set of checkboxes with matching values.
  * @param {HTMLInputElement[]} checkboxes - Array of checkbox elements.
  * @param {import("@supercat1337/store").Collection<string>} collection - The reactive collection (array of selected values).
- * @param {import("../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {import("../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 function bindToCheckboxGroup(checkboxes, collection, options = {}) {
-    if (checkboxes.length === 0) {return () => {};}
+    if (checkboxes.length === 0) {
+        return () => {};
+    }
 
     const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
-    const { debounceTime, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, autoDisconnect, event: eventName, signal } = _options;
 
     // Build value -> checkbox map
     const valueToCheckbox = {};
@@ -738,7 +803,12 @@ function bindToCheckboxGroup(checkboxes, collection, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }
 
 // @ts-check
@@ -747,17 +817,21 @@ function bindToCheckboxGroup(checkboxes, collection, options = {}) {
  * Two-way binding for a group of radio buttons with a string Atom.
  * @param {HTMLInputElement[]} radios - Array of radio input elements (must share same name).
  * @param {import("@supercat1337/store").Atom<string>} reactive - The reactive atom.
- * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 function bindToRadioGroup(radios, reactive, options = {}) {
-    if (radios.length === 0) {return () => {};}
+    if (radios.length === 0) {
+        return () => {};
+    }
 
     const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
-    const { debounceTime, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, autoDisconnect, event: eventName, signal } = _options;
 
     const radioName = radios[0].name;
-    if (!radioName) {return () => {};}
+    if (!radioName) {
+        return () => {};
+    }
 
     /** @type {Record<string, HTMLInputElement>} */
     const valueToRadio = {};
@@ -807,7 +881,12 @@ function bindToRadioGroup(radios, reactive, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }
 
 // @ts-check
@@ -816,32 +895,37 @@ function bindToRadioGroup(radios, reactive, options = {}) {
  * Two-way binding for a multiple-select element with a Collection of strings.
  * @param {HTMLSelectElement} selectElement - The multiple select element.
  * @param {import("@supercat1337/store").Collection<string>} reactive - The reactive collection (array of selected values).
- * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 function bindToSelectMultiple(selectElement, reactive, options = {}) {
-    const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
-    const { debounceTime, autoDisconnect, event: eventName } = _options;
+    let _options = Object.assign({}, globalOptions, { event: 'change' }, options);
+    let { debounceTime, autoDisconnect, event: eventName, signal } = _options;
 
     function updateSelectedOptions() {
-        const selectedValues = reactive.value;
-        const options = selectElement.options;
+        let selectedValues = reactive.value;
+        let options = selectElement.options;
         for (let i = 0; i < options.length; i++) {
-            const option = options[i];
+            let option = options[i];
             option.selected = selectedValues.indexOf(option.value) !== -1;
         }
     }
 
     updateSelectedOptions();
 
-    const changeHandler = () => {
-        const selected = Array.from(selectElement.selectedOptions).map(opt => opt.value);
+    let changeHandler = () => {
+        let selected = [];
+        for (let i = 0; i < selectElement.options.length; i++) {
+            if (selectElement.options[i].selected) {
+                selected.push(selectElement.options[i].value);
+            }
+        }
         reactive.value = selected;
     };
 
     selectElement.addEventListener(eventName, changeHandler);
 
-    const storeUnsubscribe = reactive.subscribe(_details => {
+    let storeUnsubscribe = reactive.subscribe(details => {
         if (autoDisconnect && !selectElement.isConnected) {
             cleanup();
             return;
@@ -854,7 +938,12 @@ function bindToSelectMultiple(selectElement, reactive, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }
 
 // @ts-check
@@ -863,12 +952,12 @@ function bindToSelectMultiple(selectElement, reactive, options = {}) {
  * Two-way binding for a single-select element with a string Atom.
  * @param {HTMLSelectElement} selectElement - The select element.
  * @param {import("@supercat1337/store").Atom<string>} reactive - The reactive atom.
- * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {import("../../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 function bindToSelect(selectElement, reactive, options = {}) {
     const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
-    const { debounceTime, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, autoDisconnect, event: eventName, signal } = _options;
 
     /** @param {string} value  */
     function setter(value) {
@@ -883,17 +972,24 @@ function bindToSelect(selectElement, reactive, options = {}) {
 
     selectElement.addEventListener(eventName, callback);
 
-    const unsubscribe = reactive.subscribe(details => {
+    const storeUnsubscribe = reactive.subscribe(details => {
         if (autoDisconnect && !selectElement.isConnected) {
-            unsubscribe();
+            cleanup();
             return;
         }
         setter(details.value);
     }, debounceTime);
 
-    return () => {
+    function cleanup() {
         selectElement.removeEventListener(eventName, callback);
-        unsubscribe();
+        storeUnsubscribe();
+    }
+
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
     };
 }
 
@@ -997,7 +1093,7 @@ function setter(reactiveItem, element) {
  */
 function bindToText(element, reactiveItem, options = {}) {
     const _options = Object.assign({}, globalOptions, options);
-    const { debounceTime, autoDisconnect } = _options;
+    const { debounceTime, autoDisconnect, signal } = _options;
 
     setter(reactiveItem, element);
 
@@ -1009,7 +1105,12 @@ function bindToText(element, reactiveItem, options = {}) {
         setter(reactiveItem, element);
     }, debounceTime);
 
-    return unsubscribe;
+    const removeAbortListener = attachAbortSignal(signal, unsubscribe);
+
+    return () => {
+        unsubscribe();
+        removeAbortListener();
+    };
 }
 
 export { ListItemHelper, ListItemSetterDetails, bindToAttribute, bindToCheckbox, bindToCheckboxGroup, bindToClassString, bindToCssClass, bindToDataset, bindToDisabled, bindToHtml, bindToInput, bindToList, bindToProperty, bindToRadioGroup, bindToSelect, bindToSelectMultiple, bindToShow, bindToStyle, bindToText, getDiffs, globalOptions };

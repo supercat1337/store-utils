@@ -1,18 +1,21 @@
 // @ts-check
 import { globalOptions } from '../globalOptions.js';
+import { attachAbortSignal } from '../utils/abort-helper.js';
 
 /**
  * Two-way binding between a collection of strings and a set of checkboxes with matching values.
  * @param {HTMLInputElement[]} checkboxes - Array of checkbox elements.
  * @param {import("@supercat1337/store").Collection<string>} collection - The reactive collection (array of selected values).
- * @param {import("../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect).
+ * @param {import("../types.d.ts").BinderOptions & { event?: string }} [options={}] - Options (event, debounceTime, autoDisconnect, signal).
  * @returns {import("@supercat1337/store").Unsubscriber}
  */
 export function bindToCheckboxGroup(checkboxes, collection, options = {}) {
-    if (checkboxes.length === 0) {return () => {};}
+    if (checkboxes.length === 0) {
+        return () => {};
+    }
 
     const _options = Object.assign({}, globalOptions, { event: 'change' }, options);
-    const { debounceTime, autoDisconnect, event: eventName } = _options;
+    const { debounceTime, autoDisconnect, event: eventName, signal } = _options;
 
     // Build value -> checkbox map
     const valueToCheckbox = {};
@@ -60,5 +63,10 @@ export function bindToCheckboxGroup(checkboxes, collection, options = {}) {
         storeUnsubscribe();
     }
 
-    return cleanup;
+    const removeAbortListener = attachAbortSignal(signal, cleanup);
+
+    return () => {
+        cleanup();
+        removeAbortListener();
+    };
 }
